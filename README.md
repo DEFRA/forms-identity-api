@@ -4,6 +4,36 @@ Defra Forms identity API — a private OIDC identity provider for citizen sign-i
 
 This service issues and manages identities for form submitters. It is a backend API (Hapi + MongoDB) that sits on a private network; browsers never reach it directly — only other Defra Forms services do.
 
+## Sign in flow
+
+This API is a private OIDC provider ([node-oidc-provider](https://github.com/panva/node-oidc-provider)) sitting behind the **forms-identity-ui** public façade:
+
+```
+citizen's browser ──▶ forms-identity-ui  :3002  public façade (renders sign-in pages, reverse-proxies OIDC endpoints)
+                        ▼
+                      forms-identity-api :4001  private OIDC provider (this service)
+                        ▼          GOV.UK Notify (email delivery of the one-time code)
+                      MongoDB
+```
+
+- The advertised/signed OIDC issuer is the **façade's** public URL (`OIDC_ISSUER`), never this API's origin. `provider.proxy = true` trusts the `X-Forwarded-*` headers the façade sets from its configured issuer.
+- Sign in is by email one-time code: the façade posts to `POST /otp/request`, a 6-digit code is emailed via GOV.UK Notify (argon2-hashed at rest, single-use, TTL and attempt-capped), and `POST /interaction/{uid}/complete` atomically verifies the code and completes the OIDC interaction.
+- The relying party is forms-runner (public client `runner`, authorization code + PKCE). Successful sign-in mints/loads an opaque account id in the `users` collection — the `sub` claim, keeping raw emails out of tokens.
+
+### Sign in local setup
+
+Generate a signing JWKS and add the output to `.env` as `OIDC_JWKS` (copy `.env.example` first):
+
+```sh
+node scripts/generate-jwks.mjs
+```
+
+Then:
+
+- Set `OIDC_COOKIE_KEYS` (any comma-separated secrets, identical across containers).
+- Set `NOTIFY_API_KEY` and `NOTIFY_OTP_TEMPLATE_ID` from GOV.UK Notify. The email template must contain the `((code))` and `((expiry_minutes))` personalisation placeholders.
+- Start MongoDB (`docker compose up -d mongo`) then `npm run dev`.
+
 ## Requirements
 
 ### Node.js

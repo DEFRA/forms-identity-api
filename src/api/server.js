@@ -7,6 +7,7 @@ import { failAction } from '~/src/helpers/fail-action.js'
 import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import { requestTracing } from '~/src/helpers/request-tracing.js'
 import { prepareDb } from '~/src/mongo.js'
+import { oidc } from '~/src/plugins/oidc.js'
 import { router } from '~/src/plugins/router.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
 
@@ -62,6 +63,7 @@ export async function createServer() {
   }
 
   await prepareDb(server.logger)
+  await server.register(oidc)
   await server.register(router)
 
   return server

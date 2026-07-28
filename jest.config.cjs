@@ -34,7 +34,17 @@ module.exports = {
   // See: https://jestjs.io/docs/ecmascript-modules
   transformIgnorePatterns: [
     `node_modules/(?!${[
-      '@defra/hapi-tracing' // Supports ESM only
+      '@defra/hapi-tracing', // Supports ESM only
+      'oidc-provider', // Supports ESM only (as do these dependencies of it)
+      '@koa/cors',
+      '@koa/router',
+      'jose',
+      'nanoid',
+      'quick-lru',
+      'eta',
+      'raw-body',
+      'koa',
+      'jsesc'
     ].join('|')}/)`
   ]
 }

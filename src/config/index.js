@@ -138,6 +138,78 @@ export const config = convict({
       default: 'x-cdp-request-id',
       env: 'TRACING_HEADER'
     }
+  },
+  oidc: {
+    /** @type {SchemaObj<string>} */
+    issuer: {
+      doc: 'Public OIDC issuer URL — the forms-identity-ui façade origin. This is what gets signed into tokens, never this private API origin',
+      format: String,
+      default: 'http://localhost:3002',
+      env: 'OIDC_ISSUER'
+    },
+    /** @type {SchemaObj<string>} */
+    jwks: {
+      doc: 'JSON JWKS (private signing keys). Required — generate locally with `node scripts/generate-jwks.mjs`',
+      format: String,
+      default: '',
+      env: 'OIDC_JWKS',
+      sensitive: true
+    },
+    /** @type {SchemaObj<string>} */
+    cookieKeys: {
+      doc: 'Comma-separated cookie signing keys, identical across containers',
+      format: String,
+      default: '',
+      env: 'OIDC_COOKIE_KEYS',
+      sensitive: true
+    },
+    /** @type {SchemaObj<string>} */
+    runnerRedirectUris: {
+      doc: "Comma-separated redirect URIs registered for the 'runner' client (forms-runner callback)",
+      format: String,
+      default: 'http://localhost:3000/callback',
+      env: 'OIDC_RUNNER_REDIRECT_URIS'
+    },
+    /** @type {SchemaObj<boolean>} */
+    cookieSecure: {
+      doc: 'Whether OIDC cookies are marked Secure',
+      format: Boolean,
+      default: isProduction,
+      env: 'OIDC_COOKIE_SECURE'
+    }
+  },
+  otp: {
+    /** @type {SchemaObj<number>} */
+    ttlSeconds: {
+      doc: 'One-time code time-to-live in seconds',
+      format: 'nat',
+      default: 900,
+      env: 'OTP_TTL_SECONDS'
+    },
+    /** @type {SchemaObj<number>} */
+    maxAttempts: {
+      doc: 'Failed verification attempts before a one-time code is burned',
+      format: 'nat',
+      default: 5,
+      env: 'OTP_MAX_ATTEMPTS'
+    },
+    notify: {
+      /** @type {SchemaObj<string>} */
+      apiKey: {
+        doc: 'GOV.UK Notify API key for one-time code emails',
+        format: String,
+        default: '',
+        env: 'NOTIFY_API_KEY',
+        sensitive: true
+      },
+      /** @type {SchemaObj<string>} */
+      templateId: {
+        doc: 'GOV.UK Notify email template id. The template must contain ((code)) and ((expiry_minutes)) placeholders',
+        format: String,
+        default: '',
+        env: 'NOTIFY_OTP_TEMPLATE_ID'
+      }
+    }
   }
 })
 
