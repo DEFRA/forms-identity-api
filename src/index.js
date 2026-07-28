@@ -1,13 +1,19 @@
-import process from 'node:process'
+import { chdir } from 'node:process'
 
-import { createLogger } from '#/common/helpers/logging/logger.js'
-import { startServer } from '#/common/helpers/start-server.js'
+import { getErrorMessage } from '~/src/helpers/error-message.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 
-await startServer()
+// Move working directory to build output
+chdir(import.meta.dirname)
 
-process.on('unhandledRejection', (error) => {
-  const logger = createLogger()
-  logger.info('Unhandled rejection')
-  logger.error(error)
-  process.exitCode = 1
-})
+try {
+  const server = await import('~/src/server.js')
+  await server.listen()
+} catch (err) {
+  logger.info('Server failed to start :(')
+  logger.error(
+    err,
+    `[serverStartup] Server failed to start - ${getErrorMessage(err)}`
+  )
+  throw err
+}
