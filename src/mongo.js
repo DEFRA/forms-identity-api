@@ -5,6 +5,36 @@ import { secureContext } from '~/src/secure-context.js'
 
 const isSecureContextEnabled = config.get('isSecureContextEnabled')
 
+export const ACCOUNTS_COLLECTION_NAME = 'accounts'
+export const OTPS_COLLECTION_NAME = 'otps'
+
+/**
+ * oidc-provider artifact collections (one snake_cased collection per model,
+ * written via the persistence endpoints). Listed so `prepareDb` can create
+ * their indexes up front.
+ */
+export const OIDC_COLLECTION_NAMES = [
+  'session',
+  'access_token',
+  'authorization_code',
+  'grant',
+  'interaction',
+  'refresh_token',
+  'device_code'
+]
+
+/**
+ * Revoking a grant must delete every artifact issued under it, across all of
+ * these collections.
+ */
+export const GRANTABLE_COLLECTION_NAMES = [
+  'access_token',
+  'authorization_code',
+  'refresh_token',
+  'device_code',
+  'backchannel_authentication_request'
+]
+
 /**
  * @type {Db}
  */
@@ -34,9 +64,40 @@ export async function prepareDb(logger) {
 
   db = client.db(databaseName)
 
+  await createIndexes(db)
+
   logger.info(`Mongodb connected to ${databaseName}`)
 
   return db
+}
+
+/**
+ * Creates the collection indexes (idempotent — createIndex is a no-op when
+ * the index already exists). TTL indexes are GC only: expiry correctness is
+ * enforced in-app, never delegated to Mongo's sweep.
+ * @param {Db} database
+ */
+export async function createIndexes(database) {
+  await database
+    .collection(ACCOUNTS_COLLECTION_NAME)
+    .createIndex({ email: 1 }, { unique: true })
+
+  await database
+    .collection(OTPS_COLLECTION_NAME)
+    .createIndex({ uid: 1, purpose: 1 }, { unique: true })
+  await database
+    .collection(OTPS_COLLECTION_NAME)
+    .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
+
+  for (const name of OIDC_COLLECTION_NAMES) {
+    await database
+      .collection(name)
+      .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
+  }
+  await database.collection('session').createIndex({ uid: 1 }, {})
+  for (const name of GRANTABLE_COLLECTION_NAMES) {
+    await database.collection(name).createIndex({ grantId: 1 }, {})
+  }
 }
 
 /**
