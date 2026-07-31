@@ -8,19 +8,19 @@ const MONGO_DUPLICATE_KEY = 11000
  * @typedef {object} AccountDocument
  * @property {string} _id - opaque durable account id (feeds the OIDC `sub`)
  * @property {string} email - lowercased verified email (unique index)
- * @property {boolean} emailVerified
+ * @property {boolean} emailVerified - proven by OTP at sign-up
  * @property {string} phone - recovery mobile, E.164 (capture-only for now)
- * @property {boolean} phoneVerified
- * @property {'active'} status
- * @property {Date} createdAt
- * @property {Date} updatedAt
+ * @property {boolean} phoneVerified - always false until a recovery story verifies it
+ * @property {'active'} status - lifecycle state
+ * @property {Date} createdAt - when the account was created
+ * @property {Date} updatedAt - when the account was last modified
  */
 
 /**
  * @typedef {object} AccountsService
- * @property {(email: string) => Promise<AccountDocument | null>} findByEmail
- * @property {(id: string) => Promise<AccountDocument | null>} findById
- * @property {(input: { email: string, phone: string }) => Promise<AccountDocument>} createAccount
+ * @property {(email: string) => Promise<AccountDocument | null>} findByEmail - case-insensitive lookup
+ * @property {(id: string) => Promise<AccountDocument | null>} findById - lookup by opaque account id
+ * @property {(input: { email: string, phone: string }) => Promise<AccountDocument>} createAccount - duplicate-safe JIT creation
  */
 
 /**
