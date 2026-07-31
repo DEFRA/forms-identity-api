@@ -116,6 +116,39 @@ export const config = convict({
       env: 'MONGO_DATABASE'
     }
   },
+  otp: {
+    /** @type {SchemaObj<number>} */
+    ttlSeconds: {
+      doc: 'One-time-code lifetime in seconds (checked in-app; Mongo TTL is GC only)',
+      format: Number,
+      default: 900,
+      env: 'OTP_TTL_SECONDS'
+    },
+    /** @type {SchemaObj<number>} */
+    maxAttempts: {
+      doc: 'Failed verification attempts before a code is burned',
+      format: Number,
+      default: 5,
+      env: 'OTP_MAX_ATTEMPTS'
+    },
+    notify: {
+      /** @type {SchemaObj<string>} */
+      apiKey: {
+        doc: 'GOV.UK Notify API key (required in every environment; never defaulted)',
+        format: String,
+        default: '',
+        sensitive: true,
+        env: 'NOTIFY_API_KEY'
+      },
+      /** @type {SchemaObj<string>} */
+      templateId: {
+        doc: 'GOV.UK Notify template id for the security-code email (must contain ((code)) and ((expiry_minutes)))',
+        format: String,
+        default: '',
+        env: 'NOTIFY_OTP_TEMPLATE_ID'
+      }
+    }
+  },
   /** @type {SchemaObj<string>} */
   httpProxy: {
     doc: 'HTTP Proxy',
