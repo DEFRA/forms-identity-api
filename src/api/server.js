@@ -10,7 +10,11 @@ import { db, prepareDb } from '~/src/mongo.js'
 import { makeOidcStore } from '~/src/oidc-store/store.js'
 import { router } from '~/src/plugins/router.js'
 import { oidcStoreRoutes } from '~/src/routes/oidc-store.js'
+import { signinRoutes } from '~/src/routes/signin.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
+import { makeAccountsService } from '~/src/signin/accounts-service.js'
+import { makeNotifier } from '~/src/signin/notifier.js'
+import { makeOtpService } from '~/src/signin/otp-service.js'
 
 const isProduction = config.get('isProduction')
 
@@ -68,6 +72,10 @@ export async function createServer() {
 
   // Registered after prepareDb so the `db` live binding is connected
   server.route(oidcStoreRoutes(makeOidcStore(db)))
+
+  const accountsService = makeAccountsService(db)
+  const otpService = makeOtpService(db, makeNotifier(), accountsService)
+  server.route(signinRoutes(otpService, accountsService))
 
   return server
 }
