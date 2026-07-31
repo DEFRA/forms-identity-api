@@ -13,7 +13,10 @@ describe('makeNotifier', () => {
     await notifier.sendOtp('citizen@example.com', '123456')
 
     expect(postJson).toHaveBeenCalledTimes(1)
-    const [url, options] = jest.mocked(postJson).mock.calls[0]
+    const [url, options] =
+      /** @type {[URL, { payload: object, headers: Record<string, string> }]} */ (
+        jest.mocked(postJson).mock.calls[0]
+      )
     expect(url.href).toBe(
       'https://api.notifications.service.gov.uk/v2/notifications/email'
     )
@@ -22,9 +25,7 @@ describe('makeNotifier', () => {
       email_address: 'citizen@example.com',
       personalisation: { code: '123456', expiry_minutes: 15 }
     })
-    const auth = /** @type {string} */ (
-      /** @type {Record<string, string>} */ (options.headers).Authorization
-    )
+    const auth = options.headers.Authorization
     expect(auth).toMatch(/^Bearer /)
     // the JWT iss is the Notify service id: chars [len-73, len-37) of the key
     const apiKey = /** @type {string} */ (process.env.NOTIFY_API_KEY)
