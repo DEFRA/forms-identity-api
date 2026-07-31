@@ -41,10 +41,10 @@ To run the application in `development` mode run:
 npm run dev
 ```
 
-The API listens on `http://localhost:4001` by default. Check it is running:
+The API listens on `http://localhost:3010` by default. Check it is running:
 
 ```sh
-curl http://localhost:4001/health
+curl http://localhost:3010/health
 ```
 
 ### Testing

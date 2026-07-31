@@ -26,7 +26,7 @@ export const config = convict({
   port: {
     doc: 'The port to bind.',
     format: 'port',
-    default: 4001,
+    default: 3010,
     env: 'PORT'
   },
   /**@type {SchemaObj<string>} */

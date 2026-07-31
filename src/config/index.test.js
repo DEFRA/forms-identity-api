@@ -4,7 +4,7 @@ describe('config', () => {
   it('should use the test environment variables', () => {
     expect(config.get('env')).toBe('test')
     expect(config.get('host')).toBe('0.0.0.0')
-    expect(config.get('port')).toBe(4001)
+    expect(config.get('port')).toBe(3010)
     expect(config.get('isTest')).toBe(true)
     expect(config.get('isProduction')).toBe(false)
   })
