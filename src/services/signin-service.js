@@ -180,9 +180,7 @@ export async function createAccount(email, phone) {
   const account = {
     _id: crypto.randomUUID(),
     email: email.toLowerCase(),
-    emailVerified: true,
     phone,
-    phoneVerified: false,
     status: 'active',
     createdAt: now,
     updatedAt: now

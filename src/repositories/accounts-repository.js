@@ -5,10 +5,8 @@ const MONGO_DUPLICATE_KEY = 11000
 /**
  * @typedef {object} AccountDocument
  * @property {string} _id - opaque durable account id (feeds the OIDC `sub`)
- * @property {string} email - lowercased verified email (unique index)
- * @property {boolean} emailVerified - proven by OTP at sign-up
+ * @property {string} email - lowercased email, verified by OTP at sign-up (unique index)
  * @property {string} phone - recovery mobile, E.164 (capture-only for now)
- * @property {boolean} phoneVerified - always false until a recovery story verifies it
  * @property {'active'} status - lifecycle state
  * @property {Date} createdAt - when the account was created
  * @property {Date} updatedAt - when the account was last modified

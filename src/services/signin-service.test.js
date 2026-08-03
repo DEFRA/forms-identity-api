@@ -242,8 +242,7 @@ describe('signin service', () => {
         expect.objectContaining({
           email: 'a@b.com',
           phone: '+447911123456',
-          emailVerified: true,
-          phoneVerified: false
+          status: 'active'
         })
       )
       expect(result).toEqual({

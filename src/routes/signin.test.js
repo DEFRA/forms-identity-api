@@ -141,13 +141,11 @@ describe('signin routes', () => {
   })
 
   it('GET /accounts/{id} returns claims data or 404', async () => {
-    jest.mocked(findAccountById).mockResolvedValue(
-      /** @type {never} */ ({
-        _id: 'acc-1',
-        email: 'a@b.com',
-        emailVerified: true
-      })
-    )
+    jest
+      .mocked(findAccountById)
+      .mockResolvedValue(
+        /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
+      )
     const server = await buildServer()
 
     const found = await server.inject({
@@ -157,8 +155,7 @@ describe('signin routes', () => {
     expect(found.statusCode).toBe(200)
     expect(JSON.parse(found.payload)).toEqual({
       id: 'acc-1',
-      email: 'a@b.com',
-      emailVerified: true
+      email: 'a@b.com'
     })
 
     const Boom = jest.requireActual('@hapi/boom')
