@@ -124,7 +124,8 @@ describe('signin routes', () => {
       email: 'a@b.com'
     })
 
-    jest.mocked(findAccountById).mockResolvedValue(null)
+    const Boom = jest.requireActual('@hapi/boom')
+    jest.mocked(findAccountById).mockRejectedValue(Boom.notFound())
     const missing = await server.inject({
       method: 'GET',
       url: '/accounts/nope'

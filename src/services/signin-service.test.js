@@ -1,3 +1,4 @@
+import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
@@ -7,6 +8,7 @@ import {
   SIGNIN_VERIFY_EMAIL,
   completeSignup,
   createAccount,
+  findAccountById,
   requestOtp,
   verifyOtp
 } from '~/src/services/signin-service.js'
@@ -336,6 +338,27 @@ describe('signin service', () => {
       await expect(
         createAccount({ email: 'a@b.com', phone: '+447911123456' })
       ).rejects.toThrow('boom')
+    })
+  })
+
+  describe('findAccountById', () => {
+    it('returns the account when it exists', async () => {
+      build()
+      const account = { _id: 'acc-1', email: 'a@b.com' }
+      jest
+        .mocked(accountsRepository.findById)
+        .mockResolvedValue(/** @type {never} */ (account))
+
+      await expect(findAccountById('acc-1')).resolves.toBe(account)
+    })
+
+    it('throws Boom.notFound for an unknown account', async () => {
+      build()
+      jest.mocked(accountsRepository.findById).mockResolvedValue(null)
+
+      await expect(findAccountById('gone')).rejects.toThrow(
+        Boom.notFound('Account not found')
+      )
     })
   })
 })

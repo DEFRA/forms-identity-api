@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
@@ -183,7 +184,14 @@ export async function createAccount({ email, phone }) {
 /**
  * Account lookup backing the provider's userinfo/claims
  * @param {string} id
+ * @throws {Boom.Boom} notFound when no account exists for the id
  */
-export function findAccountById(id) {
-  return accountsRepository.findById(id)
+export async function findAccountById(id) {
+  const account = await accountsRepository.findById(id)
+
+  if (!account) {
+    throw Boom.notFound('Account not found')
+  }
+
+  return account
 }

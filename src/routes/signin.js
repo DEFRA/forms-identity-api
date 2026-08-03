@@ -1,4 +1,3 @@
-import Boom from '@hapi/boom'
 import Joi from 'joi'
 
 import {
@@ -80,10 +79,6 @@ export default /** @type {ServerRoute[]} */ ([
     async handler(request) {
       const id = /** @type {string} */ (request.params.id)
       const account = await findAccountById(id)
-
-      if (!account) {
-        return Boom.notFound()
-      }
 
       return { id: account._id, email: account.email }
     }
