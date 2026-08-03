@@ -36,20 +36,16 @@ export const MODEL_COLLECTIONS = [
  * @param {number} [expiresIn]
  */
 export async function upsert(model, id, payload, expiresIn) {
-  /** @type {{ payload: Record<string, unknown>, expireAt?: Date }} */
-  const doc = { payload }
-
-  if (expiresIn) {
-    doc.expireAt = new Date(Date.now() + expiresIn * 1000)
-  }
+  // An upsert without expiresIn also clears any expiry a previous write set,
+  // so the TTL sweeper can never collect an artifact the provider has since
+  // made non-expiring
+  const update = expiresIn
+    ? { $set: { payload, expireAt: new Date(Date.now() + expiresIn * 1000) } }
+    : { $set: { payload }, $unset: { expireAt: '' } }
 
   await db
     .collection(model)
-    .updateOne(
-      { _id: /** @type {never} */ (id) },
-      { $set: doc },
-      { upsert: true }
-    )
+    .updateOne({ _id: /** @type {never} */ (id) }, update, { upsert: true })
 }
 
 /**
