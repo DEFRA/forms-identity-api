@@ -15,25 +15,17 @@ export const OTPS_COLLECTION_NAME = 'otps'
  */
 export const OIDC_COLLECTION_NAMES = [
   'session',
-  'access_token',
-  'authorization_code',
-  'grant',
   'interaction',
-  'refresh_token',
-  'device_code'
+  'grant',
+  'authorization_code',
+  'access_token'
 ]
 
 /**
  * Revoking a grant must delete every artifact issued under it, across all of
  * these collections.
  */
-export const GRANTABLE_COLLECTION_NAMES = [
-  'access_token',
-  'authorization_code',
-  'refresh_token',
-  'device_code',
-  'backchannel_authentication_request'
-]
+export const GRANTABLE_COLLECTION_NAMES = ['access_token', 'authorization_code']
 
 /**
  * @type {Db}

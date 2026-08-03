@@ -3,19 +3,17 @@ import { GRANTABLE_COLLECTION_NAMES, db } from '~/src/mongo.js'
 /**
  * Wire-level model names (snake_cased collection names). The routes validate
  * against this allowlist so the API never touches arbitrary collections.
+ * Deliberately limited to the models our provider configuration can
+ * produce — extend it when enabling a provider feature (refresh tokens,
+ * device flow, CIBA, PAR); a missing model fails loudly as a 400 on the
+ * feature's first use.
  */
 export const MODEL_COLLECTIONS = [
   'session',
-  'access_token',
-  'authorization_code',
-  'grant',
   'interaction',
-  'refresh_token',
-  'device_code',
-  'backchannel_authentication_request',
-  'pushed_authorization_request',
-  'client_credentials',
-  'replay_detection'
+  'grant',
+  'authorization_code',
+  'access_token'
 ]
 
 /**
