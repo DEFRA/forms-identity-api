@@ -34,9 +34,9 @@ const serviceId = apiKey.substring(
 )
 
 /**
- * Sends an email through the GOV.UK Notify API. Always the real Notify API —
- * never `notifications-node-client` (it bypasses the CDP egress ProxyAgent
- * that `~/src/lib/fetch.js` (Wreck) routes through). Authentication tokens
+ * Sends an email through the GOV.UK Notify API over `~/src/lib/fetch.js`
+ * (Wreck) rather than `notifications-node-client`, so the request goes through
+ * the CDP egress ProxyAgent that Wreck routes through. Authentication tokens
  * are created internally.
  * @param {string} templateId - Notify template to send
  * @param {string} emailAddress - recipient

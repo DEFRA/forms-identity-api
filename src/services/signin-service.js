@@ -63,8 +63,9 @@ function sendOtpEmail(email, code) {
 
 /**
  * Verifies a submitted code against the stored record for this interaction.
- * The email is read from that record, never from the request. A record that
- * has already been verified cannot be verified again.
+ * The email comes from that record rather than the request, so a code can only
+ * ever sign in the address it was issued to. The filter requires an unverified
+ * record, so each code verifies at most once.
  * @param {string} uid
  * @param {string} code
  * @returns {Promise<VerifyResult>}

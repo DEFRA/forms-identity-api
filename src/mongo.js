@@ -66,7 +66,7 @@ export async function prepareDb(logger) {
 /**
  * Creates the collection indexes (idempotent — createIndex is a no-op when
  * the index already exists). TTL indexes are GC only: expiry correctness is
- * enforced in-app, never delegated to Mongo's sweep.
+ * enforced in-app because Mongo's TTL sweep is lazy and best-effort.
  * @param {Db} database
  */
 export async function createIndexes(database) {
