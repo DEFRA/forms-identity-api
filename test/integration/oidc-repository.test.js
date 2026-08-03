@@ -1,4 +1,4 @@
-import { OIDC_COLLECTION_NAMES, client, db, prepareDb } from '~/src/mongo.js'
+import { OIDC_COLLECTION_NAMES, db } from '~/src/mongo.js'
 import {
   consume,
   destroy,
@@ -7,26 +7,15 @@ import {
   revokeByGrantId,
   upsert
 } from '~/src/repositories/oidc-repository.js'
-import { startMongoMemoryServer } from '~/test/helpers/mongo-memory.js'
+import { setupIntegrationDb } from '~/test/helpers/mongo-memory.js'
 
-/** @type {import('mongodb-memory-server').MongoMemoryServer} */
-let mongod
-
-beforeAll(async () => {
-  mongod = await startMongoMemoryServer()
-  await prepareDb(/** @type {never} */ ({ info: () => undefined }))
-}, 180_000)
+setupIntegrationDb()
 
 afterEach(() =>
   Promise.all(
     OIDC_COLLECTION_NAMES.map((name) => db.collection(name).deleteMany({}))
   )
 )
-
-afterAll(async () => {
-  await client.close()
-  await mongod.stop()
-})
 
 /**
  * The stored document for an artifact id

@@ -1,6 +1,7 @@
 import { MongoMemoryServer } from 'mongodb-memory-server'
 
 import { config } from '~/src/config/index.js'
+import { client, prepareDb } from '~/src/mongo.js'
 
 /**
  * The platform runs MongoDB 6.0 (see the CDP compose files), so integration
@@ -24,4 +25,25 @@ export async function startMongoMemoryServer() {
   config.set('mongo.uri', mongod.getUri())
 
   return mongod
+}
+
+/**
+ * Registers suite lifecycle hooks for integration tests that talk to the
+ * database directly (no HTTP server): boots an in-memory mongod, runs
+ * prepareDb so the real startup indexes exist, and tears both down after
+ * the suite
+ */
+export function setupIntegrationDb() {
+  /** @type {MongoMemoryServer} */
+  let mongod
+
+  beforeAll(async () => {
+    mongod = await startMongoMemoryServer()
+    await prepareDb(/** @type {never} */ ({ info: () => undefined }))
+  }, 180_000)
+
+  afterAll(async () => {
+    await client.close()
+    await mongod.stop()
+  })
 }
