@@ -105,14 +105,19 @@ export async function verifyOtp({ uid, code }) {
 
   const account = await accountsRepository.findByEmail(doc.target)
 
+  // The claim filter pins codeHash so the transition only lands on the
+  // exact record version that was verified — a concurrent resend replaces
+  // the hash, and a superseded code must not be honoured
+  const claim = { ...filter, codeHash: doc.codeHash }
+
   if (account) {
-    if (!(await otpsRepository.update(filter, { consumed: true }))) {
-      return fail // a concurrent request already spent this code
+    if (!(await otpsRepository.update(claim, { consumed: true }))) {
+      return fail // concurrently spent or superseded by a resend
     }
     return { status: 'signed-in', accountId: account._id }
   }
 
-  if (!(await otpsRepository.update(filter, { verified: true }))) {
+  if (!(await otpsRepository.update(claim, { verified: true }))) {
     return fail
   }
   return { status: 'phone-required' }

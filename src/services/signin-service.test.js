@@ -46,11 +46,12 @@ function build() {
   const match = (filter) =>
     docs.find((d) => Object.entries(filter).every(([k, v]) => d[k] === v))
 
-  jest
-    .mocked(otpsRepository.findOne)
-    .mockImplementation((filter) =>
-      Promise.resolve(/** @type {never} */ (match(filter) ?? null))
-    )
+  jest.mocked(otpsRepository.findOne).mockImplementation((filter) => {
+    // return a copy: reads must be snapshots, as with a real database, so
+    // stale-read scenarios are actually stale
+    const doc = match(filter)
+    return Promise.resolve(/** @type {never} */ (doc ? { ...doc } : null))
+  })
   jest.mocked(otpsRepository.upsert).mockImplementation((key, fields) => {
     const doc = match(key)
     if (doc) {
@@ -404,6 +405,36 @@ describe('signin service', () => {
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs[0].verified).toBe(true)
+    })
+  })
+
+  describe('resend supersession', () => {
+    it('does not honour a code once a resend has replaced it (stale claim)', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-1' }))
+      const codeA = await request('uid-1')
+      // simulate the resend landing between verify's read and its claim:
+      // the in-memory repo re-checks the claim filter, so replacing the
+      // hash after the read makes the pinned claim miss
+      const originalFindOne = jest
+        .mocked(otpsRepository.findOne)
+        .getMockImplementation()
+      jest
+        .mocked(otpsRepository.findOne)
+        .mockImplementationOnce(async (filter) => {
+          const doc = await /** @type {NonNullable<typeof originalFindOne>} */ (
+            originalFindOne
+          )(filter)
+          // resend fires immediately after the read
+          await request('uid-1')
+          return doc
+        })
+
+      const result = await verifyOtp({ uid: 'uid-1', code: codeA })
+
+      expect(result).toEqual({ status: 'invalid' })
     })
   })
 })
