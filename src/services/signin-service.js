@@ -90,25 +90,25 @@ export async function verifyOtp(uid, code) {
     return fail
   }
 
+  // Every write below pins codeHash so it only lands on the exact record
+  // version that was read — a concurrent resend replaces the hash, and a
+  // stale guess or superseded code must never spend (or burn) the fresh code
+  const claim = { ...filter, codeHash: doc.codeHash }
+
   const ok = await argon2.verify(doc.codeHash, code)
 
   if (!ok) {
-    const updated = await otpsRepository.incrementAttempts(filter)
+    const updated = await otpsRepository.incrementAttempts(claim)
     const attempts = updated?.attempts ?? 0
 
     if (attempts >= OTP_MAX_ATTEMPTS) {
-      await otpsRepository.update(filter, { consumed: true })
+      await otpsRepository.update(claim, { consumed: true })
     }
 
     return fail
   }
 
   const account = await accountsRepository.findByEmail(doc.target)
-
-  // The claim filter pins codeHash so the transition only lands on the
-  // exact record version that was verified — a concurrent resend replaces
-  // the hash, and a superseded code must not be honoured
-  const claim = { ...filter, codeHash: doc.codeHash }
 
   if (account) {
     const consumed = await otpsRepository.update(claim, { consumed: true })

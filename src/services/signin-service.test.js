@@ -197,6 +197,19 @@ describe('signin service', () => {
       expect(result).toEqual({ status: 'invalid' })
     })
 
+    it('still accepts the right code after 4 wrong attempts (the budget is 5)', async () => {
+      const docs = build()
+      const code = await request('uid-1')
+
+      for (let i = 0; i < 4; i++) {
+        await verifyOtp('uid-1', '000001')
+      }
+      const result = await verifyOtp('uid-1', code)
+
+      expect(result).toEqual({ status: 'phone-required' })
+      expect(docs[0].consumed).toBe(false)
+    })
+
     it('burns the record after 5 wrong attempts, then rejects the right code', async () => {
       const docs = build()
       const code = await request('uid-1')
@@ -417,6 +430,92 @@ describe('signin service', () => {
       const result = await verifyOtp('uid-1', codeA)
 
       expect(result).toEqual({ status: 'invalid' })
+    })
+
+    it('a stale wrong guess never spends or burns the fresh code (pinned counter)', async () => {
+      const docs = build()
+      await request('uid-1')
+      docs[0].attempts = 4 // one wrong guess away from burning
+      // resend fires between verify's read and its attempt increment; the
+      // pinned claim must miss the replaced hash
+      const originalFindOne = jest
+        .mocked(otpsRepository.findOne)
+        .getMockImplementation()
+      jest
+        .mocked(otpsRepository.findOne)
+        .mockImplementationOnce(async (filter) => {
+          const doc = await /** @type {NonNullable<typeof originalFindOne>} */ (
+            originalFindOne
+          )(filter)
+          await request('uid-1')
+          return doc
+        })
+
+      const result = await verifyOtp('uid-1', '000001')
+
+      expect(result).toEqual({ status: 'invalid' })
+      expect(docs[0].attempts).toBe(0)
+      expect(docs[0].consumed).toBe(false)
+    })
+  })
+
+  describe('resend', () => {
+    it('replaces the code: the old one stops working and the new one works', async () => {
+      const docs = build()
+      const codeA = await request('uid-1')
+      const codeB = await request('uid-1')
+
+      expect(docs).toHaveLength(1)
+      expect(await verifyOtp('uid-1', codeA)).toEqual({ status: 'invalid' })
+      expect(await verifyOtp('uid-1', codeB)).toEqual({
+        status: 'phone-required'
+      })
+    })
+
+    it('restores the full attempt budget for the new code', async () => {
+      build()
+      await request('uid-1')
+      for (let i = 0; i < 4; i++) {
+        await verifyOtp('uid-1', '000001')
+      }
+      const codeB = await request('uid-1')
+      for (let i = 0; i < 4; i++) {
+        await verifyOtp('uid-1', '000001')
+      }
+
+      expect(await verifyOtp('uid-1', codeB)).toEqual({
+        status: 'phone-required'
+      })
+    })
+
+    it('reopens a burned interaction with a fresh code and budget', async () => {
+      // The 5-attempt budget guards each code, not the interaction: a resend
+      // mints a new code with a new budget. Overall guessing volume is the
+      // job of request throttling, which the ticket has yet to decide on.
+      build()
+      await request('uid-1')
+      for (let i = 0; i < 5; i++) {
+        await verifyOtp('uid-1', '000001')
+      }
+      const codeB = await request('uid-1')
+
+      expect(await verifyOtp('uid-1', codeB)).toEqual({
+        status: 'phone-required'
+      })
+    })
+
+    it('during the phone step drops the interaction back to unverified', async () => {
+      // A resend re-runs the email challenge from scratch, so an in-flight
+      // signup must re-verify before completion is legal again
+      build()
+      const codeA = await request('uid-1')
+      await verifyOtp('uid-1', codeA)
+      await request('uid-1')
+
+      const result = await completeSignup('uid-1', '07911 123456')
+
+      expect(result).toEqual({ status: 'invalid' })
+      expect(accountsRepository.insert).not.toHaveBeenCalled()
     })
   })
 
