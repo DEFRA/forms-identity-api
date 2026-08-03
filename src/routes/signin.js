@@ -80,7 +80,11 @@ export default /** @type {ServerRoute[]} */ ([
       const id = /** @type {string} */ (request.params.id)
       const account = await findAccountById(id)
 
-      return { id: account._id, email: account.email }
+      return {
+        id: account._id,
+        email: account.email,
+        emailVerified: account.emailVerified
+      }
     }
   }
 ])

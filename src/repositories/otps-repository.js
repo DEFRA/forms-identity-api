@@ -25,7 +25,7 @@ function coll() {
 }
 
 /**
- * @param {Partial<OtpDocument>} filter
+ * @param {Filter<OtpDocument>} filter
  */
 export function findOne(filter) {
   return coll().findOne(filter)
@@ -35,7 +35,7 @@ export function findOne(filter) {
  * Upserts the record for a {uid, purpose} key — the unique index makes this
  * "one live code per authority per interaction" (resend overwrites)
  * @param {{ uid: string, purpose: string }} key
- * @param {Partial<OtpDocument>} fields
+ * @param {MatchKeysAndValues<OtpDocument>} fields
  */
 export async function upsert(key, fields) {
   await coll().updateOne(
@@ -46,8 +46,8 @@ export async function upsert(key, fields) {
 }
 
 /**
- * @param {Partial<OtpDocument>} filter
- * @param {Partial<OtpDocument>} fields
+ * @param {Filter<OtpDocument>} filter
+ * @param {MatchKeysAndValues<OtpDocument>} fields
  */
 export async function update(filter, fields) {
   await coll().updateOne(filter, { $set: fields })
@@ -55,7 +55,7 @@ export async function update(filter, fields) {
 
 /**
  * Atomically increments the attempt counter, returning the updated record
- * @param {Partial<OtpDocument>} filter
+ * @param {Filter<OtpDocument>} filter
  * @returns {Promise<OtpDocument | null>} null when no record matches
  */
 export function incrementAttempts(filter) {
@@ -67,5 +67,5 @@ export function incrementAttempts(filter) {
 }
 
 /**
- * @import { Collection } from 'mongodb'
+ * @import { Collection, Filter, MatchKeysAndValues } from 'mongodb'
  */

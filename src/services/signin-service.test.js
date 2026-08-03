@@ -48,7 +48,9 @@ function build() {
 
   jest
     .mocked(otpsRepository.findOne)
-    .mockImplementation((filter) => Promise.resolve(match(filter) ?? null))
+    .mockImplementation((filter) =>
+      Promise.resolve(/** @type {never} */ (match(filter) ?? null))
+    )
   jest.mocked(otpsRepository.upsert).mockImplementation((key, fields) => {
     const doc = match(key)
     if (doc) {
