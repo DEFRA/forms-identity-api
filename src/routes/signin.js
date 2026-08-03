@@ -1,5 +1,6 @@
 import Joi from 'joi'
 
+import { joi as telephoneJoi } from '~/src/lib/telephone.js'
 import {
   completeSignup,
   findAccountById,
@@ -61,7 +62,14 @@ export default /** @type {ServerRoute[]} */ ([
       validate: {
         payload: Joi.object({
           uid: Joi.string().required(),
-          phone: Joi.string().allow('').required()
+          // route guarantees a real telephone number (engine-plugin rule);
+          // whether it is a MOBILE is the service's business rule
+          phone:
+            /** @type {import('~/src/lib/telephone.js').TelephoneSchema} */ (
+              telephoneJoi.string()
+            )
+              .phoneNumber()
+              .required()
         })
       }
     },
