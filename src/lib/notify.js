@@ -13,13 +13,12 @@ const SERVICE_ID_SUBSTRING_REDUCTION = 73
 const SERVICE_ID_SUBSTRING_REDUCTION_2 = 37
 
 const apiKey = config.get('otp.notify.apiKey')
-const templateId = config.get('otp.notify.templateId')
 
-if (!apiKey || !templateId) {
+if (!apiKey) {
   // Fail loud at load (i.e. boot) rather than silently never deliver — the
   // same posture as the OIDC keys
   throw new Error(
-    'GOV.UK Notify not configured: set NOTIFY_API_KEY and NOTIFY_OTP_TEMPLATE_ID (required in every environment)'
+    'GOV.UK Notify not configured: set NOTIFY_API_KEY (required in every environment)'
   )
 }
 
@@ -34,26 +33,21 @@ const serviceId = apiKey.substring(
   apiKey.length - SERVICE_ID_SUBSTRING_REDUCTION_2
 )
 
-const expiryMinutes = Math.round(config.get('otp.ttlSeconds') / 60)
-
 /**
- * Sends the security-code email via GOV.UK Notify. Always the real Notify
- * API — never `notifications-node-client` (it bypasses the CDP egress
- * ProxyAgent that `~/src/lib/fetch.js` (Wreck) routes through).
- *
- * The Notify template must contain these personalisation placeholders:
- *   ((code))           -> the 6-digit one-time code
- *   ((expiry_minutes)) -> derived from otp.ttlSeconds so the email can never
- *                         drift from the configured TTL
- * @param {string} email
- * @param {string} code
+ * Sends an email through the GOV.UK Notify API. Always the real Notify API —
+ * never `notifications-node-client` (it bypasses the CDP egress ProxyAgent
+ * that `~/src/lib/fetch.js` (Wreck) routes through). Authentication tokens
+ * are created internally.
+ * @param {string} templateId - Notify template to send
+ * @param {string} emailAddress - recipient
+ * @param {Record<string, string | number>} personalisation - template placeholder values
  */
-export async function sendOtp(email, code) {
+export async function sendEmail(templateId, emailAddress, personalisation) {
   await postJson(NOTIFICATIONS_URL, {
     payload: {
       template_id: templateId,
-      email_address: email,
-      personalisation: { code, expiry_minutes: expiryMinutes }
+      email_address: emailAddress,
+      personalisation
     },
     headers: {
       Authorization: 'Bearer ' + createToken(serviceId, apiKeyId)

@@ -4,9 +4,9 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
+import { sendEmail } from '~/src/lib/notify.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
-import { sendOtp } from '~/src/repositories/notifier.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
 /**
@@ -56,9 +56,26 @@ export async function requestOtp({ uid, email }) {
     }
   )
 
-  await sendOtp(target, code)
+  await sendOtpEmail(target, code)
 
   return {}
+}
+
+/**
+ * Sends a security code by email through Notify. The template must contain:
+ *   ((code))           -> the 6-digit one-time code
+ *   ((expiry_minutes)) -> derived from otp.ttlSeconds so the email can never
+ *                         drift from the configured TTL
+ * @param {string} email
+ * @param {string} code
+ */
+function sendOtpEmail(email, code) {
+  const expiryMinutes = Math.round(config.get('otp.ttlSeconds') / 60)
+
+  return sendEmail(config.get('otp.notify.templateId'), email, {
+    code,
+    expiry_minutes: expiryMinutes
+  })
 }
 
 /**

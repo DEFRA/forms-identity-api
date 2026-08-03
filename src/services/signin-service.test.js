@@ -1,8 +1,8 @@
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
+import { sendEmail } from '~/src/lib/notify.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
-import { sendOtp } from '~/src/repositories/notifier.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import {
   SIGNIN_VERIFY_EMAIL,
@@ -26,8 +26,8 @@ jest.mock('~/src/repositories/accounts-repository.js', () => ({
   insert: jest.fn(),
   isDuplicateKeyError: jest.fn()
 }))
-jest.mock('~/src/repositories/notifier.js', () => ({
-  sendOtp: jest.fn()
+jest.mock('~/src/lib/notify.js', () => ({
+  sendEmail: jest.fn()
 }))
 
 /**
@@ -77,10 +77,19 @@ function build() {
     doc.attempts = Number(doc.attempts ?? 0) + 1
     return Promise.resolve(/** @type {never} */ (doc))
   })
-  jest.mocked(sendOtp).mockResolvedValue(undefined)
+  jest.mocked(sendEmail).mockResolvedValue(undefined)
   jest.mocked(accountsRepository.findByEmail).mockResolvedValue(null)
 
   return docs
+}
+
+/**
+ * The code from the most recent Notify email
+ * @returns {string}
+ */
+function lastSentCode() {
+  const personalisation = jest.mocked(sendEmail).mock.calls.at(-1)?.[2]
+  return /** @type {string} */ (personalisation?.code)
 }
 
 /**
@@ -89,7 +98,7 @@ function build() {
  */
 async function request(uid, email = 'a@b.com') {
   await requestOtp({ uid, email })
-  return /** @type {string} */ (jest.mocked(sendOtp).mock.calls.at(-1)?.[1])
+  return lastSentCode()
 }
 
 describe('signin service', () => {
@@ -99,11 +108,12 @@ describe('signin service', () => {
 
       await requestOtp({ uid: 'uid-1', email: 'A@B.com' })
 
-      expect(sendOtp).toHaveBeenCalledWith(
+      expect(sendEmail).toHaveBeenCalledWith(
+        process.env.NOTIFY_OTP_TEMPLATE_ID,
         'a@b.com',
-        expect.stringMatching(/^\d{6}$/)
+        { code: expect.stringMatching(/^\d{6}$/), expiry_minutes: 15 }
       )
-      const code = /** @type {string} */ (jest.mocked(sendOtp).mock.calls[0][1])
+      const code = lastSentCode()
       const doc = docs[0]
       expect(doc.uid).toBe('uid-1')
       expect(doc.purpose).toBe(SIGNIN_VERIFY_EMAIL)
