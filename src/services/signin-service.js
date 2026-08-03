@@ -17,8 +17,6 @@ import * as otpsRepository from '~/src/repositories/otps-repository.js'
  */
 export const SIGNIN_VERIFY_EMAIL = 'SIGNIN_VERIFY_EMAIL'
 
-const CODE_PATTERN = /^\d{6}$/
-
 /**
  * @typedef {{ status: 'invalid' } | { status: 'expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
@@ -89,8 +87,7 @@ export async function verifyOtp({ uid, code }) {
     return { status: 'expired' }
   }
 
-  const ok =
-    CODE_PATTERN.test(code) && (await argon2.verify(doc.codeHash, code))
+  const ok = await argon2.verify(doc.codeHash, code)
 
   if (!ok) {
     const maxAttempts = config.get('otp.maxAttempts')

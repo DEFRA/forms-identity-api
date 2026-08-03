@@ -199,16 +199,6 @@ describe('signin service', () => {
       expect(docs[0].consumed).toBe(true)
     })
 
-    it('rejects malformed codes without argon2 work but burns an attempt', async () => {
-      const docs = build()
-      await request('uid-1')
-
-      const result = await verifyOtp({ uid: 'uid-1', code: 'abc' })
-
-      expect(result).toEqual({ status: 'invalid' })
-      expect(docs[0].attempts).toBe(1)
-    })
-
     it('rejects re-verification once verified (one-way state machine)', async () => {
       build()
       const code = await request('uid-1')

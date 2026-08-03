@@ -39,7 +39,11 @@ export default /** @type {ServerRoute[]} */ ([
       validate: {
         payload: Joi.object({
           uid: Joi.string().required(),
-          code: Joi.string().allow('').required()
+          // the route guarantees shape (6 digits); whether the code is
+          // CORRECT is the service's business
+          code: Joi.string()
+            .pattern(/^\d{6}$/)
+            .required()
         })
       }
     },

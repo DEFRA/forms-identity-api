@@ -73,18 +73,18 @@ describe('signin routes', () => {
     })
   })
 
-  it('POST /otp/verify tolerates arbitrary code text (backend enforces)', async () => {
-    jest.mocked(verifyOtp).mockResolvedValue({ status: 'invalid' })
+  it('POST /otp/verify rejects malformed codes with 400 before the service', async () => {
     const server = await buildServer()
 
-    const res = await server.inject({
-      method: 'POST',
-      url: '/otp/verify',
-      payload: { uid: 'uid-1', code: 'definitely wrong' }
-    })
-
-    expect(res.statusCode).toBe(200)
-    expect(JSON.parse(res.payload)).toEqual({ status: 'invalid' })
+    for (const code of ['definitely wrong', '12345', '1234567', '']) {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/otp/verify',
+        payload: { uid: 'uid-1', code }
+      })
+      expect(res.statusCode).toBe(400)
+    }
+    expect(verifyOtp).not.toHaveBeenCalled()
   })
 
   it('POST /accounts delegates to completeSignup', async () => {
