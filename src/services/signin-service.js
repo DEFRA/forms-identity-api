@@ -10,6 +10,11 @@ import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
+const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
+const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
+const OTP_EXPIRY_MINUTES = Math.round(OTP_TTL_SECONDS / 60)
+const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
+
 // Every OTP operation filters on {uid, purpose} — never uid alone — so codes
 // are isolated per interaction and per purpose.
 
@@ -24,7 +29,7 @@ export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
   const codeHash = await argon2.hash(code)
-  const expireAt = new Date(Date.now() + config.get('otp.ttlSeconds') * 1000)
+  const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
 
   await otpsRepository.upsert(
     { uid, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
@@ -50,17 +55,16 @@ export async function requestOtp(uid, email) {
  * @param {string} code
  */
 function sendOtpEmail(email, code) {
-  const expiryMinutes = Math.round(config.get('otp.ttlSeconds') / 60)
-
-  return sendEmail(config.get('otp.notify.templateId'), email, {
+  return sendEmail(OTP_NOTIFY_TEMPLATE_ID, email, {
     code,
-    expiry_minutes: expiryMinutes
+    expiry_minutes: OTP_EXPIRY_MINUTES
   })
 }
 
 /**
- * Verifies a code. Identity always derives from the STORED record's
- * target, never the wire. A verified record cannot be re-verified.
+ * Verifies a submitted code against the stored record for this interaction.
+ * The email is read from that record, never from the request. A record that
+ * has already been verified cannot be verified again.
  * @param {string} uid
  * @param {string} code
  * @returns {Promise<VerifyResult>}
@@ -88,11 +92,10 @@ export async function verifyOtp(uid, code) {
   const ok = await argon2.verify(doc.codeHash, code)
 
   if (!ok) {
-    const maxAttempts = config.get('otp.maxAttempts')
     const updated = await otpsRepository.incrementAttempts(filter)
     const attempts = updated?.attempts ?? 0
 
-    if (attempts >= maxAttempts) {
+    if (attempts >= OTP_MAX_ATTEMPTS) {
       await otpsRepository.update(filter, { consumed: true })
     }
 
