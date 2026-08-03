@@ -176,14 +176,14 @@ describe('signin service', () => {
       expect(recovery?.consumed).toBe(false)
     })
 
-    it('reports expiry distinctly', async () => {
+    it('rejects expired codes as invalid (in-app check; Mongo TTL is lazy GC)', async () => {
       const docs = build()
       const code = await request('uid-1')
       docs[0].expireAt = new Date(Date.now() - 1000)
 
       const result = await verifyOtp({ uid: 'uid-1', code })
 
-      expect(result).toEqual({ status: 'expired' })
+      expect(result).toEqual({ status: 'invalid' })
     })
 
     it('burns the record after 5 wrong attempts, then rejects the right code', async () => {

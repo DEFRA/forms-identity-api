@@ -18,7 +18,7 @@ import * as otpsRepository from '~/src/repositories/otps-repository.js'
 export const SIGNIN_VERIFY_EMAIL = 'SIGNIN_VERIFY_EMAIL'
 
 /**
- * @typedef {{ status: 'invalid' } | { status: 'expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
+ * @typedef {{ status: 'invalid' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */
 
@@ -83,8 +83,12 @@ export async function verifyOtp({ uid, code }) {
     return fail
   }
 
+  // Normally the Mongo TTL index has already deleted an expired record
+  // (falling into the !doc branch above), but its sweep is lazy (~60s), so
+  // expiry correctness is enforced here. Either way the caller just sees
+  // an invalid code — expiry is not a distinct outcome.
   if (doc.expireAt.getTime() < Date.now()) {
-    return { status: 'expired' }
+    return fail
   }
 
   const ok = await argon2.verify(doc.codeHash, code)
