@@ -4,7 +4,7 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
-import { PURPOSE } from '~/src/constants.js'
+import { PURPOSE, STATUS } from '~/src/constants.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
@@ -67,7 +67,7 @@ function sendOtpEmail(email, code) {
  */
 export async function verifyOtp(uid, code) {
   /** @type {VerifyResult} */
-  const fail = { status: 'invalid' }
+  const fail = { status: STATUS.INVALID }
   const filter = {
     uid,
     purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
@@ -113,7 +113,7 @@ export async function verifyOtp(uid, code) {
       return fail // concurrently spent or superseded by a resend
     }
 
-    return { status: 'signed-in', accountId: account._id }
+    return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
 
   const verified = await otpsRepository.update(claim, { verified: true })
@@ -122,7 +122,7 @@ export async function verifyOtp(uid, code) {
     return fail
   }
 
-  return { status: 'phone-required' }
+  return { status: STATUS.PHONE_REQUIRED }
 }
 
 /**
@@ -143,7 +143,7 @@ export async function completeSignup(uid, phone) {
   const doc = await otpsRepository.findOne(filter)
 
   if (!doc) {
-    return { status: 'invalid' }
+    return { status: STATUS.INVALID }
   }
 
   // normalised to E.164; the route already checked it is a telephone number,
@@ -152,7 +152,7 @@ export async function completeSignup(uid, phone) {
   try {
     phoneNumber = normaliseMobile(phone)
   } catch {
-    return { status: 'invalid-phone' }
+    return { status: STATUS.INVALID_PHONE }
   }
 
   const account = await createAccount(doc.target, phoneNumber)
@@ -160,10 +160,10 @@ export async function completeSignup(uid, phone) {
   const consumed = await otpsRepository.update(filter, { consumed: true })
 
   if (!consumed) {
-    return { status: 'invalid' } // a concurrent submit already completed
+    return { status: STATUS.INVALID } // a concurrent submit already completed
   }
 
-  return { status: 'signed-in', accountId: account._id }
+  return { status: STATUS.SIGNED_IN, accountId: account._id }
 }
 
 /**
