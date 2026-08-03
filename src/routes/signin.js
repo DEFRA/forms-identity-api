@@ -1,12 +1,12 @@
 import Boom from '@hapi/boom'
 import Joi from 'joi'
 
-import { findById } from '~/src/signin/accounts-service.js'
 import {
   completeSignup,
+  findAccountById,
   requestOtp,
   verifyOtp
-} from '~/src/signin/otp-service.js'
+} from '~/src/services/signin-service.js'
 
 /**
  * Sign-in domain routes, consumed only by forms-identity-ui over the
@@ -79,7 +79,7 @@ export default /** @type {ServerRoute[]} */ ([
     },
     async handler(request) {
       const id = /** @type {string} */ (request.params.id)
-      const account = await findById(id)
+      const account = await findAccountById(id)
 
       if (!account) {
         return Boom.notFound()

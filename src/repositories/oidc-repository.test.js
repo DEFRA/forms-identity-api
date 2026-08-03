@@ -6,7 +6,7 @@ import {
   findByUid,
   revokeByGrantId,
   upsert
-} from '~/src/oidc-store/store.js'
+} from '~/src/repositories/oidc-repository.js'
 
 jest.mock('~/src/mongo.js', () => ({
   GRANTABLE_COLLECTION_NAMES: [

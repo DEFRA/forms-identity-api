@@ -1,7 +1,7 @@
 import { token } from '@hapi/jwt'
 
 import { postJson } from '~/src/lib/fetch.js'
-import { sendOtp } from '~/src/signin/notifier.js'
+import { sendOtp } from '~/src/repositories/notifier.js'
 
 jest.mock('~/src/lib/fetch.js')
 
@@ -47,7 +47,7 @@ describe('notifier', () => {
 
     expect(() => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports -- fresh module load to trigger the boot-time guard
-      require('~/src/signin/notifier.js')
+      require('~/src/repositories/notifier.js')
     }).toThrow(/NOTIFY_API_KEY/)
 
     jest.dontMock('~/src/config/index.js')

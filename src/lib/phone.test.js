@@ -1,4 +1,4 @@
-import { normaliseMobile } from '~/src/signin/phone.js'
+import { normaliseMobile } from '~/src/lib/phone.js'
 
 describe('normaliseMobile', () => {
   it.each([

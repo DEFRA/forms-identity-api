@@ -7,10 +7,10 @@ import {
   findByUid,
   revokeByGrantId,
   upsert
-} from '~/src/oidc-store/store.js'
+} from '~/src/repositories/oidc-repository.js'
 import oidcStoreRoutes from '~/src/routes/oidc-store.js'
 
-jest.mock('~/src/oidc-store/store.js', () => ({
+jest.mock('~/src/repositories/oidc-repository.js', () => ({
   MODEL_COLLECTIONS: [
     'session',
     'access_token',

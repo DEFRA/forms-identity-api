@@ -1,20 +1,18 @@
 import Hapi from '@hapi/hapi'
 
 import signinRoutes from '~/src/routes/signin.js'
-import { findById } from '~/src/signin/accounts-service.js'
 import {
   completeSignup,
+  findAccountById,
   requestOtp,
   verifyOtp
-} from '~/src/signin/otp-service.js'
+} from '~/src/services/signin-service.js'
 
-jest.mock('~/src/signin/otp-service.js', () => ({
+jest.mock('~/src/services/signin-service.js', () => ({
   requestOtp: jest.fn(),
   verifyOtp: jest.fn(),
-  completeSignup: jest.fn()
-}))
-jest.mock('~/src/signin/accounts-service.js', () => ({
-  findById: jest.fn()
+  completeSignup: jest.fn(),
+  findAccountById: jest.fn()
 }))
 
 /** Builds a server with the static routes (services are module-mocked) */
@@ -110,7 +108,7 @@ describe('signin routes', () => {
 
   it('GET /accounts/{id} returns claims data or 404', async () => {
     jest
-      .mocked(findById)
+      .mocked(findAccountById)
       .mockResolvedValue(
         /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
       )
@@ -126,7 +124,7 @@ describe('signin routes', () => {
       email: 'a@b.com'
     })
 
-    jest.mocked(findById).mockResolvedValue(null)
+    jest.mocked(findAccountById).mockResolvedValue(null)
     const missing = await server.inject({
       method: 'GET',
       url: '/accounts/nope'

@@ -9,7 +9,7 @@ import {
   findByUid,
   revokeByGrantId,
   upsert
-} from '~/src/oidc-store/store.js'
+} from '~/src/repositories/oidc-repository.js'
 
 const modelParam = Joi.string()
   .valid(...MODEL_COLLECTIONS)
