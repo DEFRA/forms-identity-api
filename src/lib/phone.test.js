@@ -15,7 +15,7 @@ describe('normaliseMobile', () => {
     ['07700'], // too short
     ['not a number'],
     ['']
-  ])('rejects %s', (input) => {
-    expect(normaliseMobile(input)).toBeNull()
+  ])('throws on %s', (input) => {
+    expect(() => normaliseMobile(input)).toThrow()
   })
 })

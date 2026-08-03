@@ -27,7 +27,7 @@ async function buildServer() {
 
 describe('signin routes', () => {
   it('POST /otp/request validates and delegates', async () => {
-    jest.mocked(requestOtp).mockResolvedValue({})
+    jest.mocked(requestOtp).mockResolvedValue(undefined)
     const server = await buildServer()
 
     const res = await server.inject({
@@ -36,11 +36,8 @@ describe('signin routes', () => {
       payload: { uid: 'uid-1', email: 'a@b.com' }
     })
 
-    expect(res.statusCode).toBe(200)
-    expect(requestOtp).toHaveBeenCalledWith({
-      uid: 'uid-1',
-      email: 'a@b.com'
-    })
+    expect(res.statusCode).toBe(204)
+    expect(requestOtp).toHaveBeenCalledWith('uid-1', 'a@b.com')
   })
 
   it('POST /otp/request rejects an invalid email with 400', async () => {
@@ -129,10 +126,7 @@ describe('signin routes', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    expect(completeSignup).toHaveBeenCalledWith({
-      uid: 'uid-1',
-      phone: '07911 123456'
-    })
+    expect(completeSignup).toHaveBeenCalledWith('uid-1', '07911 123456')
   })
 
   it('GET /otp/{uid} returns the display email', async () => {

@@ -97,7 +97,7 @@ function lastSentCode() {
  * @param {string} uid
  */
 async function request(uid, email = 'a@b.com') {
-  await requestOtp({ uid, email })
+  await requestOtp(uid, email)
   return lastSentCode()
 }
 
@@ -106,7 +106,7 @@ describe('signin service', () => {
     it('stores an argon2 hash keyed by {uid, purpose} and sends the code', async () => {
       const docs = build()
 
-      await requestOtp({ uid: 'uid-1', email: 'A@B.com' })
+      await requestOtp('uid-1', 'A@B.com')
 
       expect(sendEmail).toHaveBeenCalledWith(
         process.env.NOTIFY_OTP_TEMPLATE_ID,
@@ -134,7 +134,7 @@ describe('signin service', () => {
         .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-1' }))
       const code = await request('uid-1')
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-1' })
       expect(docs[0].consumed).toBe(true)
@@ -144,7 +144,7 @@ describe('signin service', () => {
       const docs = build()
       const code = await request('uid-1')
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'phone-required' })
       expect(docs[0].verified).toBe(true)
@@ -156,7 +156,7 @@ describe('signin service', () => {
       const codeA = await request('uid-a')
       await request('uid-b')
 
-      const result = await verifyOtp({ uid: 'uid-b', code: codeA })
+      const result = await verifyOtp('uid-b', codeA)
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs.find((d) => d.uid === 'uid-b')?.attempts).toBe(1)
@@ -179,7 +179,7 @@ describe('signin service', () => {
         expireAt: new Date(Date.now() + 60_000)
       })
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'phone-required' })
       const recovery = docs.find((d) => d.purpose === 'RECOVERY_VERIFY_PHONE')
@@ -192,7 +192,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       docs[0].expireAt = new Date(Date.now() - 1000)
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -202,9 +202,9 @@ describe('signin service', () => {
       const code = await request('uid-1')
 
       for (let i = 0; i < 5; i++) {
-        await verifyOtp({ uid: 'uid-1', code: '000001' })
+        await verifyOtp('uid-1', '000001')
       }
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs[0].consumed).toBe(true)
@@ -213,9 +213,9 @@ describe('signin service', () => {
     it('rejects re-verification once verified (one-way state machine)', async () => {
       build()
       const code = await request('uid-1')
-      await verifyOtp({ uid: 'uid-1', code })
+      await verifyOtp('uid-1', code)
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -226,7 +226,7 @@ describe('signin service', () => {
     async function verified() {
       const docs = build()
       const code = await request('uid-1')
-      await verifyOtp({ uid: 'uid-1', code })
+      await verifyOtp('uid-1', code)
       return docs
     }
 
@@ -236,10 +236,7 @@ describe('signin service', () => {
         .mocked(accountsRepository.insert)
         .mockImplementation((account) => Promise.resolve(account))
 
-      const result = await completeSignup({
-        uid: 'uid-1',
-        phone: '07911 123456'
-      })
+      const result = await completeSignup('uid-1', '07911 123456')
 
       expect(accountsRepository.insert).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -259,10 +256,7 @@ describe('signin service', () => {
     it('rejects an invalid phone without consuming the record', async () => {
       const docs = await verified()
 
-      const result = await completeSignup({
-        uid: 'uid-1',
-        phone: '020 7946 0000'
-      })
+      const result = await completeSignup('uid-1', '020 7946 0000')
 
       expect(result).toEqual({ status: 'invalid-phone' })
       expect(docs[0].consumed).toBe(false)
@@ -272,10 +266,7 @@ describe('signin service', () => {
       build()
       await request('uid-1')
 
-      const result = await completeSignup({
-        uid: 'uid-1',
-        phone: '07911 123456'
-      })
+      const result = await completeSignup('uid-1', '07911 123456')
 
       expect(result).toEqual({ status: 'invalid' })
       expect(accountsRepository.insert).not.toHaveBeenCalled()
@@ -284,10 +275,7 @@ describe('signin service', () => {
     it('rejects completion for a different uid', async () => {
       await verified()
 
-      const result = await completeSignup({
-        uid: 'uid-other',
-        phone: '07911 123456'
-      })
+      const result = await completeSignup('uid-other', '07911 123456')
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -297,12 +285,9 @@ describe('signin service', () => {
       jest
         .mocked(accountsRepository.insert)
         .mockImplementation((account) => Promise.resolve(account))
-      await completeSignup({ uid: 'uid-1', phone: '07911 123456' })
+      await completeSignup('uid-1', '07911 123456')
 
-      const result = await completeSignup({
-        uid: 'uid-1',
-        phone: '07911 123456'
-      })
+      const result = await completeSignup('uid-1', '07911 123456')
 
       expect(result).toEqual({ status: 'invalid' })
       expect(accountsRepository.insert).toHaveBeenCalledTimes(1)
@@ -321,10 +306,10 @@ describe('signin service', () => {
         .mocked(accountsRepository.findByEmail)
         .mockResolvedValue(/** @type {never} */ (existing))
 
-      const account = await createAccount({
-        email: 'Citizen@Example.com',
-        phone: '+447911123456'
-      })
+      const account = await createAccount(
+        'Citizen@Example.com',
+        '+447911123456'
+      )
 
       expect(account).toBe(existing)
       expect(accountsRepository.findByEmail).toHaveBeenCalledWith(
@@ -339,9 +324,9 @@ describe('signin service', () => {
         .mockRejectedValue(new Error('boom'))
       jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(false)
 
-      await expect(
-        createAccount({ email: 'a@b.com', phone: '+447911123456' })
-      ).rejects.toThrow('boom')
+      await expect(createAccount('a@b.com', '+447911123456')).rejects.toThrow(
+        'boom'
+      )
     })
   })
 
@@ -375,7 +360,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -385,7 +370,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
 
-      const result = await verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -393,16 +378,13 @@ describe('signin service', () => {
     it('completeSignup returns invalid when a concurrent submit completes first', async () => {
       const docs = build()
       const code = await request('uid-1')
-      await verifyOtp({ uid: 'uid-1', code })
+      await verifyOtp('uid-1', code)
       jest
         .mocked(accountsRepository.insert)
         .mockImplementation((account) => Promise.resolve(account))
       jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
 
-      const result = await completeSignup({
-        uid: 'uid-1',
-        phone: '07911 123456'
-      })
+      const result = await completeSignup('uid-1', '07911 123456')
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs[0].verified).toBe(true)
@@ -433,7 +415,7 @@ describe('signin service', () => {
           return doc
         })
 
-      const result = await verifyOtp({ uid: 'uid-1', code: codeA })
+      const result = await verifyOtp('uid-1', codeA)
 
       expect(result).toEqual({ status: 'invalid' })
     })

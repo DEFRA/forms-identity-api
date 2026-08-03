@@ -14,23 +14,18 @@ const MOBILE_TYPES = new Set([
  * normalises it to E.164 — the same google-libphonenumber validation the
  * forms phone component uses
  * @param {string} input
- * @returns {string | null} E.164 string, or null when not a valid mobile
+ * @returns {string} the number in E.164 format
+ * @throws {Error} when the input is not a valid mobile number
  */
 export function normaliseMobile(input) {
-  let parsed
-
-  try {
-    parsed = phoneUtil.parse(input, 'GB')
-  } catch {
-    return null
-  }
+  const parsed = phoneUtil.parse(input, 'GB')
 
   if (!phoneUtil.isValidNumber(parsed)) {
-    return null
+    throw new Error('Not a valid phone number')
   }
 
   if (!MOBILE_TYPES.has(phoneUtil.getNumberType(parsed))) {
-    return null
+    throw new Error('Not a mobile phone number')
   }
 
   return phoneUtil.format(parsed, PhoneNumberFormat.E164)

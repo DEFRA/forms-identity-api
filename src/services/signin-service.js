@@ -17,9 +17,10 @@ import * as otpsRepository from '~/src/repositories/otps-repository.js'
  * Issues a 6-digit code, stores only its argon2 hash keyed by
  * {uid, purpose} (upsert = resend semantics: one live code per authority
  * per interaction) and delivers the plaintext via Notify
- * @param {{ uid: string, email: string }} input
+ * @param {string} uid
+ * @param {string} email
  */
-export async function requestOtp({ uid, email }) {
+export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
   const codeHash = await argon2.hash(code)
@@ -38,8 +39,6 @@ export async function requestOtp({ uid, email }) {
   )
 
   await sendOtpEmail(target, code)
-
-  return {}
 }
 
 /**
@@ -61,12 +60,12 @@ function sendOtpEmail(email, code) {
 
 /**
  * Verifies a code. Identity always derives from the STORED record's
- * target, never the wire. One-way state machine: a verified record cannot
- * be re-verified.
- * @param {{ uid: string, code: string }} input
+ * target, never the wire. A verified record cannot be re-verified.
+ * @param {string} uid
+ * @param {string} code
  * @returns {Promise<VerifyResult>}
  */
-export async function verifyOtp({ uid, code }) {
+export async function verifyOtp(uid, code) {
   /** @type {VerifyResult} */
   const fail = { status: 'invalid' }
   const filter = {
@@ -77,15 +76,12 @@ export async function verifyOtp({ uid, code }) {
   }
   const doc = await otpsRepository.findOne(filter)
 
-  if (!doc) {
-    return fail
-  }
+  // Mongo TTL is lazy and isn't evaluated in real time. Double check the
+  // expiry in-app in case it hasn't been dropped yet - this is security
+  // related, we need to be sure.
+  const isExpired = doc ? doc.expireAt.getTime() < Date.now() : false
 
-  // Normally the Mongo TTL index has already deleted an expired record
-  // (falling into the !doc branch above), but its sweep is lazy (~60s), so
-  // expiry correctness is enforced here. Either way the caller just sees
-  // an invalid code — expiry is not a distinct outcome.
-  if (doc.expireAt.getTime() < Date.now()) {
+  if (!doc || isExpired) {
     return fail
   }
 
@@ -94,8 +90,9 @@ export async function verifyOtp({ uid, code }) {
   if (!ok) {
     const maxAttempts = config.get('otp.maxAttempts')
     const updated = await otpsRepository.incrementAttempts(filter)
+    const attempts = updated?.attempts ?? 0
 
-    if ((updated?.attempts ?? 0) >= maxAttempts) {
+    if (attempts >= maxAttempts) {
       await otpsRepository.update(filter, { consumed: true })
     }
 
@@ -110,15 +107,21 @@ export async function verifyOtp({ uid, code }) {
   const claim = { ...filter, codeHash: doc.codeHash }
 
   if (account) {
-    if (!(await otpsRepository.update(claim, { consumed: true }))) {
+    const consumed = await otpsRepository.update(claim, { consumed: true })
+
+    if (!consumed) {
       return fail // concurrently spent or superseded by a resend
     }
+
     return { status: 'signed-in', accountId: account._id }
   }
 
-  if (!(await otpsRepository.update(claim, { verified: true }))) {
+  const verified = await otpsRepository.update(claim, { verified: true })
+
+  if (!verified) {
     return fail
   }
+
   return { status: 'phone-required' }
 }
 
@@ -126,10 +129,11 @@ export async function verifyOtp({ uid, code }) {
  * Completes JIT signup: only legal against a verified, unconsumed record
  * for this uid. Account creation precedes consumption so a crash between
  * the two self-heals (the retry finds the account and signs it in).
- * @param {{ uid: string, phone: string }} input
+ * @param {string} uid
+ * @param {string} phone
  * @returns {Promise<CompleteResult>}
  */
-export async function completeSignup({ uid, phone }) {
+export async function completeSignup(uid, phone) {
   const filter = {
     uid,
     purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
@@ -142,15 +146,20 @@ export async function completeSignup({ uid, phone }) {
     return { status: 'invalid' }
   }
 
-  const e164 = normaliseMobile(phone)
-
-  if (!e164) {
+  // normalised to E.164; the route already checked it is a telephone number,
+  // so a throw here means it is a valid number but not a mobile
+  let phoneNumber
+  try {
+    phoneNumber = normaliseMobile(phone)
+  } catch {
     return { status: 'invalid-phone' }
   }
 
-  const account = await createAccount({ email: doc.target, phone: e164 })
+  const account = await createAccount(doc.target, phoneNumber)
 
-  if (!(await otpsRepository.update(filter, { consumed: true }))) {
+  const consumed = await otpsRepository.update(filter, { consumed: true })
+
+  if (!consumed) {
     return { status: 'invalid' } // a concurrent submit already completed
   }
 
@@ -162,9 +171,10 @@ export async function completeSignup({ uid, phone }) {
  * crash-retry after creation but before the OTP was consumed) the unique
  * index rejects the insert and the existing account is returned instead —
  * the caller signs that account in.
- * @param {{ email: string, phone: string }} input
+ * @param {string} email
+ * @param {string} phone - E.164
  */
-export async function createAccount({ email, phone }) {
+export async function createAccount(email, phone) {
   const now = new Date()
   /** @type {import('~/src/repositories/accounts-repository.js').AccountDocument} */
   const account = {

@@ -27,11 +27,12 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
-    handler(request) {
+    async handler(request, h) {
       const { uid, email } = /** @type {{ uid: string, email: string }} */ (
         request.payload
       )
-      return requestOtp({ uid, email })
+      await requestOtp(uid, email)
+      return h.response().code(204)
     }
   },
   {
@@ -41,8 +42,6 @@ export default /** @type {ServerRoute[]} */ ([
       validate: {
         payload: Joi.object({
           uid: Joi.string().required(),
-          // the route guarantees shape (6 digits); whether the code is
-          // CORRECT is the service's business
           code: Joi.string()
             .pattern(/^\d{6}$/)
             .required()
@@ -53,7 +52,7 @@ export default /** @type {ServerRoute[]} */ ([
       const { uid, code } = /** @type {{ uid: string, code: string }} */ (
         request.payload
       )
-      return verifyOtp({ uid, code })
+      return verifyOtp(uid, code)
     }
   },
   {
@@ -63,8 +62,6 @@ export default /** @type {ServerRoute[]} */ ([
       validate: {
         payload: Joi.object({
           uid: Joi.string().required(),
-          // route guarantees a real telephone number (engine-plugin rule);
-          // whether it is a MOBILE is the service's business rule
           phone:
             /** @type {import('~/src/lib/telephone.js').TelephoneSchema} */ (
               telephoneJoi.string()
@@ -78,7 +75,7 @@ export default /** @type {ServerRoute[]} */ ([
       const { uid, phone } = /** @type {{ uid: string, phone: string }} */ (
         request.payload
       )
-      return completeSignup({ uid, phone })
+      return completeSignup(uid, phone)
     }
   },
   {
@@ -91,8 +88,9 @@ export default /** @type {ServerRoute[]} */ ([
     },
     async handler(request) {
       const uid = /** @type {string} */ (request.params.uid)
+      const email = await findSigninEmail(uid)
 
-      return { email: await findSigninEmail(uid) }
+      return { email }
     }
   },
   {
