@@ -10,7 +10,7 @@ jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 
 const { inject, requestCode, verify } = setupSigninFlow()
 
-describe('citizen sign-in journeys (real server, real Mongo)', () => {
+describe('citizen sign-in journeys', () => {
   it('signs a new user up end to end, with four fumbled attempts on the way', async () => {
     const code = await requestCode('uid-signup', 'Citizen@Example.com')
 

@@ -10,7 +10,17 @@ jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 
 const { inject } = setupSigninFlow()
 
-describe('concurrency (the guarantees only real Mongo can prove)', () => {
+/*
+ * Node dispatches these operations from one thread, but Promise.all puts
+ * every request in flight before any completes: the handlers interleave at
+ * their await points and the driver spreads the commands across its
+ * connection pool, so mongod executes them in parallel for real. Whether a
+ * given run hits the narrowest race window (e.g. two upserts both choosing
+ * the insert path) is still timing-dependent — these tests assert the
+ * invariants that must hold under any interleaving, while the unit layer
+ * forces the collision branches deterministically.
+ */
+describe('concurrency', () => {
   it('handles concurrent code requests without crashing, keeping one record', async () => {
     const responses = await Promise.all(
       Array.from({ length: 8 }, () =>

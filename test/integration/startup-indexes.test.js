@@ -13,7 +13,7 @@ setupIntegrationDb()
  */
 const indexesOf = (collection) => db.collection(collection).indexes()
 
-describe('startup indexes (the ones the security model depends on)', () => {
+describe('startup indexes', () => {
   it('enforces account email uniqueness and one code per {uid, purpose}', async () => {
     expect(await indexesOf(ACCOUNTS_COLLECTION_NAME)).toContainEqual(
       expect.objectContaining({ key: { email: 1 }, unique: true })

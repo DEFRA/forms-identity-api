@@ -6,7 +6,7 @@ jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 
 const { inject, requestCode, verify } = setupSigninFlow()
 
-describe('one-time-code lifecycle (real server, real Mongo)', () => {
+describe('one-time-code lifecycle', () => {
   it('burns the code after five wrong attempts — the real code is rejected afterwards', async () => {
     const code = await requestCode('uid-burn')
 

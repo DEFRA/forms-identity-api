@@ -26,7 +26,7 @@ function stored(model, id) {
   return db.collection(model).findOne({ _id: /** @type {never} */ (id) })
 }
 
-describe('oidc store (real Mongo)', () => {
+describe('oidc store', () => {
   it('nests the payload under a payload field with a computed expireAt', async () => {
     await upsert('session', 'id-1', { uid: 'u-1', foo: 'bar' }, 60)
 

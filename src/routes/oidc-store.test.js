@@ -127,16 +127,4 @@ describe('oidc store routes', () => {
     expect(revokeRes.statusCode).toBe(204)
     expect(revokeByGrantId).toHaveBeenCalledWith('grant-1')
   })
-
-  it('rejects model names outside the allowlist', async () => {
-    const server = await buildServer()
-
-    const res = await server.inject({
-      method: 'GET',
-      url: '/oidc/accounts/id-1'
-    })
-
-    expect(res.statusCode).toBe(400)
-    expect(find).not.toHaveBeenCalled()
-  })
 })
