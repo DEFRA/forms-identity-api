@@ -14,9 +14,10 @@ process.env.MONGO_DATABASE = 'forms-identity-api'
 process.env.HTTP_PROXY = ''
 
 // Notify test values — the non-hex 'z' uuids keep GitHub push protection
-// (which pattern-matches real Notify keys) from firing on this file
+// (which pattern-matches real Notify keys) from firing on this file. The two
+// uuids differ so tests can tell the service id (first) from the key id (last)
 process.env.NOTIFY_API_KEY =
-  'test_key-zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz-zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
+  'test_key-zzzzzzzz-zzzz-zzzz-zzzz-servicezzzzz-zzzzzzzz-zzzz-zzzz-zzzz-apikeyzzzzzz'
 process.env.NOTIFY_OTP_TEMPLATE_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
 
 process.env.TRACING_HEADER = 'x-cdp-request-id'

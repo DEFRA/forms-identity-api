@@ -40,6 +40,19 @@ describe('signin routes', () => {
     expect(requestOtp).toHaveBeenCalledWith('uid-1', 'a@b.com')
   })
 
+  it('POST /otp/request surfaces a delivery failure as a 500', async () => {
+    jest.mocked(requestOtp).mockRejectedValue(new Error('Notify is down'))
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/otp/request',
+      payload: { uid: 'uid-1', email: 'a@b.com' }
+    })
+
+    expect(res.statusCode).toBe(500)
+  })
+
   it('POST /otp/request rejects an invalid email with 400', async () => {
     const server = await buildServer()
 
@@ -138,6 +151,16 @@ describe('signin routes', () => {
     expect(res.statusCode).toBe(200)
     expect(JSON.parse(res.payload)).toEqual({ email: 'a@b.com' })
     expect(findSigninEmail).toHaveBeenCalledWith('uid-1')
+  })
+
+  it('GET /otp/{uid} returns 404 when no code has been requested', async () => {
+    const Boom = jest.requireActual('@hapi/boom')
+    jest.mocked(findSigninEmail).mockRejectedValue(Boom.notFound())
+    const server = await buildServer()
+
+    const res = await server.inject({ method: 'GET', url: '/otp/uid-none' })
+
+    expect(res.statusCode).toBe(404)
   })
 
   it('GET /accounts/{id} returns claims data or 404', async () => {

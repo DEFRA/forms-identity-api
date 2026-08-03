@@ -4,7 +4,8 @@ describe('normaliseMobile', () => {
   it.each([
     ['07911 123456', '+447911123456'], // UK national format
     ['+44 7911 123456', '+447911123456'],
-    ['+33 6 12 34 56 78', '+33612345678'] // international mobile
+    ['+33 6 12 34 56 78', '+33612345678'], // international mobile
+    ['+1 202 456 1111', '+12024561111'] // US: FIXED_LINE_OR_MOBILE regions count as mobile
   ])('normalises %s to %s', (input, expected) => {
     expect(normaliseMobile(input)).toBe(expected)
   })

@@ -11,7 +11,12 @@ module.exports = {
   restoreMocks: true,
   clearMocks: true,
   silent: true,
-  testMatch: ['<rootDir>/src/**/*.test.{cjs,js,mjs}'],
+  // Unit tests live alongside their module (src/**); integration tests,
+  // which span modules, live in test/integration
+  testMatch: [
+    '<rootDir>/src/**/*.test.{cjs,js,mjs}',
+    '<rootDir>/test/**/*.test.{cjs,js,mjs}'
+  ],
   reporters: CI
     ? [['github-actions', { silent: false }], 'summary']
     : ['default', 'summary'],

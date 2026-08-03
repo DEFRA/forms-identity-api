@@ -11,13 +11,9 @@ import {
 import oidcStoreRoutes from '~/src/routes/oidc-store.js'
 
 jest.mock('~/src/repositories/oidc-repository.js', () => ({
-  MODEL_COLLECTIONS: [
-    'session',
-    'access_token',
-    'authorization_code',
-    'grant',
-    'interaction'
-  ],
+  // the real allowlist, so these tests fail if it ever drifts or widens
+  MODEL_COLLECTIONS: jest.requireActual('~/src/repositories/oidc-repository.js')
+    .MODEL_COLLECTIONS,
   upsert: jest.fn(),
   find: jest.fn(),
   findByUid: jest.fn(),
@@ -35,6 +31,28 @@ async function buildServer() {
 }
 
 describe('oidc store routes', () => {
+  it('rejects models outside the allowlist with 400 on every route', async () => {
+    // The allowlist is what stops these routes reading or writing arbitrary
+    // collections — `accounts` is exactly the collection they must never reach
+    const server = await buildServer()
+
+    const attempts = [
+      { method: 'PUT', url: '/oidc/accounts/id-1', payload: { payload: {} } },
+      { method: 'GET', url: '/oidc/accounts/id-1' },
+      { method: 'GET', url: '/oidc/accounts/uid/u-1' },
+      { method: 'POST', url: '/oidc/accounts/id-1/consume' },
+      { method: 'DELETE', url: '/oidc/accounts/id-1' }
+    ]
+
+    for (const attempt of attempts) {
+      const res = await server.inject(attempt)
+      expect(res.statusCode).toBe(400)
+    }
+    for (const repositoryCall of [upsert, find, findByUid, consume, destroy]) {
+      expect(repositoryCall).not.toHaveBeenCalled()
+    }
+  })
+
   it('PUT upserts payloads', async () => {
     jest.mocked(upsert).mockResolvedValue(undefined)
     const server = await buildServer()

@@ -5,6 +5,11 @@ import { sendEmail } from '~/src/lib/notify.js'
 
 jest.mock('~/src/lib/fetch.js')
 
+// The uuids embedded in jest.setup.js's NOTIFY_API_KEY, asserted as literals
+// so the extraction offsets are verified rather than re-derived
+const SERVICE_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-servicezzzzz'
+const API_KEY_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-apikeyzzzzzz'
+
 describe('notify client', () => {
   it('posts an email to Notify with a bearer JWT', async () => {
     await sendEmail('template-1', 'citizen@example.com', {
@@ -27,11 +32,32 @@ describe('notify client', () => {
     })
     const auth = options.headers.Authorization
     expect(auth).toMatch(/^Bearer /)
-    // the JWT iss is the Notify service id: chars [len-73, len-37) of the key
-    const apiKey = /** @type {string} */ (process.env.NOTIFY_API_KEY)
-    const decoded = token.decode(auth.replace('Bearer ', ''))
-    expect(decoded.decoded.payload.iss).toBe(
-      apiKey.substring(apiKey.length - 73, apiKey.length - 37)
-    )
+
+    const artifacts = token.decode(auth.replace('Bearer ', ''))
+    expect(artifacts.decoded.payload.iss).toBe(SERVICE_ID)
+    // signed with the key id (the trailing uuid), per the Notify API contract
+    expect(() => {
+      token.verifySignature(artifacts, { key: API_KEY_ID, algorithm: 'HS256' })
+    }).not.toThrow()
+    expect(() => {
+      token.verifySignature(artifacts, { key: SERVICE_ID, algorithm: 'HS256' })
+    }).toThrow()
+  })
+
+  it('refuses to boot when no Notify API key is configured', async () => {
+    const saved = process.env.NOTIFY_API_KEY
+    // empty rather than deleted: the isolated reload re-runs dotenv, which
+    // would repopulate an unset variable from a local .env
+    process.env.NOTIFY_API_KEY = ''
+
+    try {
+      await jest.isolateModulesAsync(async () => {
+        await expect(import('~/src/lib/notify.js')).rejects.toThrow(
+          'GOV.UK Notify not configured'
+        )
+      })
+    } finally {
+      process.env.NOTIFY_API_KEY = saved
+    }
   })
 })
