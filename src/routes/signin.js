@@ -62,12 +62,9 @@ export default /** @type {ServerRoute[]} */ ([
       validate: {
         payload: Joi.object({
           uid: Joi.string().required(),
-          phone:
-            /** @type {import('~/src/lib/telephone.js').TelephoneSchema} */ (
-              telephoneJoi.string()
-            )
-              .phoneNumber()
-              .required()
+          phone: /** @type {TelephoneSchema} */ (telephoneJoi.string())
+            .phoneNumber()
+            .required()
         })
       }
     },
@@ -112,4 +109,5 @@ export default /** @type {ServerRoute[]} */ ([
 
 /**
  * @import { ServerRoute } from '@hapi/hapi'
+ * @import { TelephoneSchema } from '~/src/lib/telephone.js'
  */

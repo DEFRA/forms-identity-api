@@ -179,7 +179,7 @@ export async function completeSignup(uid, phone) {
  */
 export async function createAccount(email, phone) {
   const now = new Date()
-  /** @type {import('~/src/repositories/accounts-repository.js').AccountDocument} */
+  /** @type {AccountDocument} */
   const account = {
     _id: crypto.randomUUID(),
     email: email.toLowerCase(),
@@ -238,6 +238,7 @@ export async function findAccountById(id) {
 }
 
 /**
+ * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
  * @typedef {{ status: 'invalid' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */
