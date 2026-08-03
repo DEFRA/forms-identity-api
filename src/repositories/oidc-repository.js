@@ -1,3 +1,5 @@
+import Boom from '@hapi/boom'
+
 import { GRANTABLE_COLLECTION_NAMES, db } from '~/src/mongo.js'
 
 /**
@@ -16,25 +18,15 @@ export const MODEL_COLLECTIONS = [
   'access_token'
 ]
 
-/**
- * Strips Mongo storage fields before handing a payload back
- * (`expireAt` is our TTL/GC field, not part of the payload)
- * @param {Record<string, unknown>} doc
- */
-function strip(doc) {
-  const rest = { ...doc }
-  delete rest._id
-  delete rest.expireAt
-  return rest
-}
-
 /*
- * Mongo persistence for oidc-provider artifacts, exposed to the UI's HTTP
- * adapter via routes. One collection per model; `_id` is the model's string
- * id; `expiresIn` (seconds) becomes an `expireAt` Date the TTL index
- * garbage-collects (expiry correctness stays in oidc-provider). Collections
- * resolve lazily — the `db` live binding is only assigned once `prepareDb`
- * has run.
+ * Mongo persistence for oidc-provider artifacts, exposed to forms-identity-ui
+ * via routes. One collection per model; `_id` is the model's string id. The
+ * provider's opaque payload is stored under a single `payload` field and read
+ * back verbatim — nothing else in the stored document is ever returned, so a
+ * future storage field can't leak into a response by accident. `expiresIn`
+ * (seconds) becomes an `expireAt` Date the TTL index garbage-collects (expiry
+ * correctness stays in oidc-provider). Collections resolve lazily — the `db`
+ * live binding is only assigned once `prepareDb` has run.
  */
 
 /**
@@ -44,8 +36,8 @@ function strip(doc) {
  * @param {number} [expiresIn]
  */
 export async function upsert(model, id, payload, expiresIn) {
-  /** @type {Record<string, unknown>} */
-  const doc = { ...payload }
+  /** @type {{ payload: Record<string, unknown>, expireAt?: Date }} */
+  const doc = { payload }
 
   if (expiresIn) {
     doc.expireAt = new Date(Date.now() + expiresIn * 1000)
@@ -63,21 +55,33 @@ export async function upsert(model, id, payload, expiresIn) {
 /**
  * @param {string} model
  * @param {string} id
+ * @throws {Boom.Boom} notFound when the artifact does not exist
  */
 export async function find(model, id) {
   const doc = await db
     .collection(model)
     .findOne({ _id: /** @type {never} */ (id) })
-  return doc ? strip(doc) : undefined
+
+  if (!doc) {
+    throw Boom.notFound()
+  }
+
+  return doc.payload
 }
 
 /**
  * @param {string} model
  * @param {string} uid
+ * @throws {Boom.Boom} notFound when no artifact has that uid
  */
 export async function findByUid(model, uid) {
-  const doc = await db.collection(model).findOne({ uid })
-  return doc ? strip(doc) : undefined
+  const doc = await db.collection(model).findOne({ 'payload.uid': uid })
+
+  if (!doc) {
+    throw Boom.notFound()
+  }
+
+  return doc.payload
 }
 
 /**
@@ -89,7 +93,7 @@ export async function consume(model, id) {
     .collection(model)
     .updateOne(
       { _id: /** @type {never} */ (id) },
-      { $set: { consumed: Math.floor(Date.now() / 1000) } }
+      { $set: { 'payload.consumed': Math.floor(Date.now() / 1000) } }
     )
 }
 
@@ -107,7 +111,7 @@ export async function destroy(model, id) {
 export async function revokeByGrantId(grantId) {
   await Promise.all(
     GRANTABLE_COLLECTION_NAMES.map((name) =>
-      db.collection(name).deleteMany({ grantId })
+      db.collection(name).deleteMany({ 'payload.grantId': grantId })
     )
   )
 }

@@ -86,9 +86,11 @@ export async function createIndexes(database) {
       .collection(name)
       .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
   }
-  await database.collection('session').createIndex({ uid: 1 }, {})
+  // oidc-provider payloads are stored under a `payload` field, so lookups by
+  // uid/grantId target the nested keys
+  await database.collection('session').createIndex({ 'payload.uid': 1 }, {})
   for (const name of GRANTABLE_COLLECTION_NAMES) {
-    await database.collection(name).createIndex({ grantId: 1 }, {})
+    await database.collection(name).createIndex({ 'payload.grantId': 1 }, {})
   }
 }
 

@@ -38,9 +38,12 @@ describe('createIndexes', () => {
       { expireAfterSeconds: 0 }
     )
     // sessions are also looked up by uid
-    expect(collections.session).toHaveBeenCalledWith({ uid: 1 }, {})
+    expect(collections.session).toHaveBeenCalledWith({ 'payload.uid': 1 }, {})
     // grantable artifacts are bulk-deleted by grantId
-    expect(collections.access_token).toHaveBeenCalledWith({ grantId: 1 }, {})
+    expect(collections.access_token).toHaveBeenCalledWith(
+      { 'payload.grantId': 1 },
+      {}
+    )
   })
 })
 
