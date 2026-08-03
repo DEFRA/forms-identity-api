@@ -27,6 +27,19 @@ export const OIDC_COLLECTION_NAMES = [
  */
 export const GRANTABLE_COLLECTION_NAMES = ['access_token', 'authorization_code']
 
+const MONGO_DUPLICATE_KEY = 11000
+
+/**
+ * Whether an error is Mongo's duplicate-key rejection — exposed so callers
+ * can react to uniqueness conflicts without knowing Mongo error codes
+ * @param {unknown} err
+ */
+export function isDuplicateKeyError(err) {
+  return (
+    err instanceof Error && 'code' in err && err.code === MONGO_DUPLICATE_KEY
+  )
+}
+
 /**
  * @type {Db}
  */

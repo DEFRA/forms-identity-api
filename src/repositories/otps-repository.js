@@ -1,4 +1,4 @@
-import { OTPS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { OTPS_COLLECTION_NAME, db, isDuplicateKeyError } from '~/src/mongo.js'
 
 /**
  * @typedef {object} OtpDocument
@@ -38,11 +38,19 @@ export function findOne(filter) {
  * @param {MatchKeysAndValues<OtpDocument>} fields
  */
 export async function upsert(key, fields) {
-  await coll().updateOne(
-    key,
-    { $set: fields, $setOnInsert: { createdAt: new Date() } },
-    { upsert: true }
-  )
+  const update = { $set: fields, $setOnInsert: { createdAt: new Date() } }
+
+  try {
+    await coll().updateOne(key, update, { upsert: true })
+  } catch (err) {
+    // Two concurrent upserts for a fresh key can both take the insert path,
+    // and the unique {uid, purpose} index rejects one — retrying lands the
+    // loser on the update path of the record the winner just created
+    if (!isDuplicateKeyError(err)) {
+      throw err
+    }
+    await coll().updateOne(key, update, { upsert: true })
+  }
 }
 
 /**

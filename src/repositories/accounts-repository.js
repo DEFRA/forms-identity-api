@@ -1,6 +1,6 @@
 import { ACCOUNTS_COLLECTION_NAME, db } from '~/src/mongo.js'
 
-const MONGO_DUPLICATE_KEY = 11000
+export { isDuplicateKeyError } from '~/src/mongo.js'
 
 /**
  * @typedef {object} AccountDocument
@@ -44,17 +44,6 @@ export function findById(id) {
 export async function insert(account) {
   await coll().insertOne(account)
   return account
-}
-
-/**
- * Whether an error is Mongo's duplicate-key rejection — exposed so callers
- * can react to uniqueness conflicts without knowing Mongo error codes
- * @param {unknown} err
- */
-export function isDuplicateKeyError(err) {
-  return (
-    err instanceof Error && 'code' in err && err.code === MONGO_DUPLICATE_KEY
-  )
 }
 
 /**
