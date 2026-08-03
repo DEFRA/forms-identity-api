@@ -1,16 +1,13 @@
 import { token } from '@hapi/jwt'
 
-import { config } from '~/src/config/index.js'
 import { postJson } from '~/src/lib/fetch.js'
-import { makeNotifier } from '~/src/signin/notifier.js'
+import { sendOtp } from '~/src/signin/notifier.js'
 
 jest.mock('~/src/lib/fetch.js')
 
-describe('makeNotifier', () => {
+describe('notifier', () => {
   it('posts the code to Notify with a bearer JWT and expiry personalisation', async () => {
-    const notifier = makeNotifier()
-
-    await notifier.sendOtp('citizen@example.com', '123456')
+    await sendOtp('citizen@example.com', '123456')
 
     expect(postJson).toHaveBeenCalledTimes(1)
     const [url, options] =
@@ -35,16 +32,24 @@ describe('makeNotifier', () => {
     )
   })
 
-  it('throws at construction when Notify is not configured', () => {
-    const spy = jest.spyOn(config, 'get').mockImplementation((key) => {
-      if (key === 'otp.notify.apiKey') {
-        return ''
+  it('fails loud at load when Notify is not configured', () => {
+    jest.resetModules()
+    jest.doMock('~/src/config/index.js', () => {
+      const actual = jest.requireActual('~/src/config/index.js')
+      return {
+        config: {
+          /** @param {string} key */
+          get: (key) =>
+            key === 'otp.notify.apiKey' ? '' : actual.config.get(key)
+        }
       }
-      return jest.requireActual('~/src/config/index.js').config.get(key)
     })
 
-    expect(() => makeNotifier()).toThrow(/NOTIFY_API_KEY/)
+    expect(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- fresh module load to trigger the boot-time guard
+      require('~/src/signin/notifier.js')
+    }).toThrow(/NOTIFY_API_KEY/)
 
-    spy.mockRestore()
+    jest.dontMock('~/src/config/index.js')
   })
 })

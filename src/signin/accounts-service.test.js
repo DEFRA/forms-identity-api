@@ -1,19 +1,19 @@
-import { makeAccountsService } from '~/src/signin/accounts-service.js'
+import { db } from '~/src/mongo.js'
+import { createAccount, findByEmail } from '~/src/signin/accounts-service.js'
 
-/** Builds a fake accounts collection */
+jest.mock('~/src/mongo.js', () => ({
+  ACCOUNTS_COLLECTION_NAME: 'accounts',
+  db: { collection: jest.fn() }
+}))
+
+/** Builds a fake accounts collection and wires it into the mocked db */
 function fakeColl() {
-  return {
+  const coll = {
     findOne: jest.fn(),
     insertOne: jest.fn()
   }
-}
-
-/** @param {ReturnType<typeof fakeColl>} coll */
-function service(coll) {
-  const db = /** @type {import('mongodb').Db} */ (
-    /** @type {unknown} */ ({ collection: () => coll })
-  )
-  return makeAccountsService(db)
+  jest.mocked(db.collection).mockReturnValue(/** @type {never} */ (coll))
+  return coll
 }
 
 describe('accounts service', () => {
@@ -21,7 +21,7 @@ describe('accounts service', () => {
     const coll = fakeColl()
     coll.findOne.mockResolvedValue(null)
 
-    await service(coll).findByEmail('Citizen@Example.COM')
+    await findByEmail('Citizen@Example.COM')
 
     expect(coll.findOne).toHaveBeenCalledWith({
       email: 'citizen@example.com'
@@ -32,7 +32,7 @@ describe('accounts service', () => {
     const coll = fakeColl()
     coll.insertOne.mockResolvedValue({ acknowledged: true })
 
-    const account = await service(coll).createAccount({
+    const account = await createAccount({
       email: 'Citizen@Example.com',
       phone: '+447911123456'
     })
@@ -57,7 +57,7 @@ describe('accounts service', () => {
     coll.insertOne.mockRejectedValue(dup)
     coll.findOne.mockResolvedValue(existing)
 
-    const account = await service(coll).createAccount({
+    const account = await createAccount({
       email: 'citizen@example.com',
       phone: '+447911123456'
     })
@@ -70,7 +70,7 @@ describe('accounts service', () => {
     coll.insertOne.mockRejectedValue(new Error('boom'))
 
     await expect(
-      service(coll).createAccount({
+      createAccount({
         email: 'citizen@example.com',
         phone: '+447911123456'
       })

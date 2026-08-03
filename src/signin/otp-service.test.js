@@ -1,9 +1,27 @@
 import argon2 from 'argon2'
 
+import { db } from '~/src/mongo.js'
+import { createAccount, findByEmail } from '~/src/signin/accounts-service.js'
+import { sendOtp } from '~/src/signin/notifier.js'
 import {
   SIGNIN_VERIFY_EMAIL,
-  makeOtpService
+  completeSignup,
+  requestOtp,
+  verifyOtp
 } from '~/src/signin/otp-service.js'
+
+jest.mock('~/src/mongo.js', () => ({
+  OTPS_COLLECTION_NAME: 'otps',
+  ACCOUNTS_COLLECTION_NAME: 'accounts',
+  db: { collection: jest.fn() }
+}))
+jest.mock('~/src/signin/notifier.js', () => ({
+  sendOtp: jest.fn()
+}))
+jest.mock('~/src/signin/accounts-service.js', () => ({
+  findByEmail: jest.fn(),
+  createAccount: jest.fn()
+}))
 
 /**
  * @typedef {Record<string, any>} Doc
@@ -70,38 +88,36 @@ function memoryColl() {
   }
 }
 
-/**
- * @typedef {ReturnType<typeof build>} Built
- */
-
-/** Builds the service plus captive fakes */
+/** Wires a fresh in-memory collection into the mocked db and default mocks */
 function build() {
   const coll = memoryColl()
-  const db = /** @type {import('mongodb').Db} */ (
-    /** @type {unknown} */ ({ collection: () => coll })
-  )
-  const notifier = { sendOtp: jest.fn().mockResolvedValue(undefined) }
-  const accounts = /** @type {any} */ ({
-    findByEmail: jest.fn().mockResolvedValue(null),
-    findById: jest.fn(),
-    createAccount: jest.fn()
-  })
-  const service = makeOtpService(db, notifier, accounts)
-  return { coll, notifier, accounts, service }
+  jest.mocked(db.collection).mockReturnValue(/** @type {never} */ (coll))
+  jest.mocked(sendOtp).mockResolvedValue(undefined)
+  jest.mocked(findByEmail).mockResolvedValue(null)
+  return coll
+}
+
+/**
+ * Requests a code for the uid and returns the code that "was sent"
+ * @param {string} uid
+ */
+async function request(uid, email = 'a@b.com') {
+  await requestOtp({ uid, email })
+  return /** @type {string} */ (jest.mocked(sendOtp).mock.calls.at(-1)?.[1])
 }
 
 describe('otp service', () => {
   describe('requestOtp', () => {
     it('stores an argon2 hash keyed by {uid, purpose} and sends the code', async () => {
-      const { coll, notifier, service } = build()
+      const coll = build()
 
-      await service.requestOtp({ uid: 'uid-1', email: 'A@B.com' })
+      await requestOtp({ uid: 'uid-1', email: 'A@B.com' })
 
-      expect(notifier.sendOtp).toHaveBeenCalledWith(
+      expect(sendOtp).toHaveBeenCalledWith(
         'a@b.com',
         expect.stringMatching(/^\d{6}$/)
       )
-      const code = /** @type {string} */ (notifier.sendOtp.mock.calls[0][1])
+      const code = /** @type {string} */ (jest.mocked(sendOtp).mock.calls[0][1])
       const doc = coll.docs[0]
       expect(doc.uid).toBe('uid-1')
       expect(doc.purpose).toBe(SIGNIN_VERIFY_EMAIL)
@@ -115,77 +131,64 @@ describe('otp service', () => {
   })
 
   describe('verifyOtp', () => {
-    /**
-     * Requests a code and returns it
-     * @param {Built} built
-     * @param {string} uid
-     */
-    async function request(built, uid, email = 'a@b.com') {
-      await built.service.requestOtp({ uid, email })
-      return /** @type {string} */ (
-        built.notifier.sendOtp.mock.calls.at(-1)?.[1]
-      )
-    }
-
     it('signs in immediately when an account exists', async () => {
-      const built = build()
-      built.accounts.findByEmail.mockResolvedValue({ _id: 'acc-1' })
-      const code = await request(built, 'uid-1')
+      const coll = build()
+      jest
+        .mocked(findByEmail)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-1' }))
+      const code = await request('uid-1')
 
-      const result = await built.service.verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp({ uid: 'uid-1', code })
 
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-1' })
-      expect(built.coll.docs[0].consumed).toBe(true)
+      expect(coll.docs[0].consumed).toBe(true)
     })
 
     it('requires the phone step when no account exists', async () => {
-      const built = build()
-      const code = await request(built, 'uid-1')
+      const coll = build()
+      const code = await request('uid-1')
 
-      const result = await built.service.verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp({ uid: 'uid-1', code })
 
       expect(result).toEqual({ status: 'phone-required' })
-      expect(built.coll.docs[0].verified).toBe(true)
-      expect(built.coll.docs[0].consumed).toBe(false)
+      expect(coll.docs[0].verified).toBe(true)
+      expect(coll.docs[0].consumed).toBe(false)
     })
 
     it('rejects a code minted for another interaction and burns the local attempt', async () => {
-      const built = build()
-      const codeA = await request(built, 'uid-a')
-      await request(built, 'uid-b')
+      const coll = build()
+      const codeA = await request('uid-a')
+      await request('uid-b')
 
-      const result = await built.service.verifyOtp({
-        uid: 'uid-b',
-        code: codeA
-      })
+      const result = await verifyOtp({ uid: 'uid-b', code: codeA })
 
       expect(result).toEqual({ status: 'invalid' })
-      const docB = built.coll.docs.find((d) => d.uid === 'uid-b')
-      const docA = built.coll.docs.find((d) => d.uid === 'uid-a')
+      const docB = coll.docs.find((d) => d.uid === 'uid-b')
+      const docA = coll.docs.find((d) => d.uid === 'uid-a')
       expect(docB?.attempts).toBe(1)
       expect(docA?.attempts).toBe(0)
     })
 
     it('never matches a record of a different purpose on the same uid', async () => {
-      const built = build()
-      const code = await request(built, 'uid-1')
+      const coll = build()
+      const code = await request('uid-1')
       // seed a future SMS/recovery record sharing the uid
-      built.coll.docs.push({
+      coll.docs.push({
         _id: 99,
         uid: 'uid-1',
         purpose: 'RECOVERY_VERIFY_PHONE',
         target: '+447911123456',
-        codeHash: built.coll.docs[0].codeHash,
+        codeHash: coll.docs[0].codeHash,
         attempts: 0,
         verified: false,
         consumed: false,
         expireAt: new Date(Date.now() + 60_000)
       })
 
-      const result = await built.service.verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp({ uid: 'uid-1', code })
 
       expect(result).toEqual({ status: 'phone-required' })
-      const recovery = built.coll.docs.find(
+      const recovery = coll.docs.find(
         (d) => d.purpose === 'RECOVERY_VERIFY_PHONE'
       )
       expect(recovery?.verified).toBe(false)
@@ -193,110 +196,106 @@ describe('otp service', () => {
     })
 
     it('reports expiry distinctly', async () => {
-      const built = build()
-      const code = await request(built, 'uid-1')
-      built.coll.docs[0].expireAt = new Date(Date.now() - 1000)
+      const coll = build()
+      const code = await request('uid-1')
+      coll.docs[0].expireAt = new Date(Date.now() - 1000)
 
-      const result = await built.service.verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp({ uid: 'uid-1', code })
 
       expect(result).toEqual({ status: 'expired' })
     })
 
     it('burns the record after 5 wrong attempts, then rejects the right code', async () => {
-      const built = build()
-      const code = await request(built, 'uid-1')
+      const coll = build()
+      const code = await request('uid-1')
 
       for (let i = 0; i < 5; i++) {
-        await built.service.verifyOtp({ uid: 'uid-1', code: '000001' })
+        await verifyOtp({ uid: 'uid-1', code: '000001' })
       }
-      const result = await built.service.verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp({ uid: 'uid-1', code })
 
       expect(result).toEqual({ status: 'invalid' })
-      expect(built.coll.docs[0].consumed).toBe(true)
+      expect(coll.docs[0].consumed).toBe(true)
     })
 
     it('rejects malformed codes without argon2 work but burns an attempt', async () => {
-      const built = build()
-      await request(built, 'uid-1')
+      const coll = build()
+      await request('uid-1')
 
-      const result = await built.service.verifyOtp({
-        uid: 'uid-1',
-        code: 'abc'
-      })
+      const result = await verifyOtp({ uid: 'uid-1', code: 'abc' })
 
       expect(result).toEqual({ status: 'invalid' })
-      expect(built.coll.docs[0].attempts).toBe(1)
+      expect(coll.docs[0].attempts).toBe(1)
     })
 
     it('rejects re-verification once verified (one-way state machine)', async () => {
-      const built = build()
-      const code = await request(built, 'uid-1')
-      await built.service.verifyOtp({ uid: 'uid-1', code })
+      build()
+      const code = await request('uid-1')
+      await verifyOtp({ uid: 'uid-1', code })
 
-      const result = await built.service.verifyOtp({ uid: 'uid-1', code })
+      const result = await verifyOtp({ uid: 'uid-1', code })
 
       expect(result).toEqual({ status: 'invalid' })
     })
   })
 
   describe('completeSignup', () => {
-    /** Drives a uid to the verified state and returns the built context */
+    /** Drives uid-1 to the verified state, returns the collection */
     async function verified() {
-      const built = build()
-      await built.service.requestOtp({ uid: 'uid-1', email: 'a@b.com' })
-      const code = /** @type {string} */ (
-        built.notifier.sendOtp.mock.calls.at(-1)?.[1]
-      )
-      await built.service.verifyOtp({ uid: 'uid-1', code })
-      return built
+      const coll = build()
+      const code = await request('uid-1')
+      await verifyOtp({ uid: 'uid-1', code })
+      return coll
     }
 
     it('creates the account from the stored email and consumes the record', async () => {
-      const built = await verified()
-      built.accounts.createAccount.mockResolvedValue({ _id: 'acc-9' })
+      const coll = await verified()
+      jest
+        .mocked(createAccount)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-9' }))
 
-      const result = await built.service.completeSignup({
+      const result = await completeSignup({
         uid: 'uid-1',
         phone: '07911 123456'
       })
 
-      expect(built.accounts.createAccount).toHaveBeenCalledWith({
+      expect(createAccount).toHaveBeenCalledWith({
         email: 'a@b.com',
         phone: '+447911123456'
       })
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-9' })
-      expect(built.coll.docs[0].consumed).toBe(true)
+      expect(coll.docs[0].consumed).toBe(true)
     })
 
     it('rejects an invalid phone without consuming the record', async () => {
-      const built = await verified()
+      const coll = await verified()
 
-      const result = await built.service.completeSignup({
+      const result = await completeSignup({
         uid: 'uid-1',
         phone: '020 7946 0000'
       })
 
       expect(result).toEqual({ status: 'invalid-phone' })
-      expect(built.coll.docs[0].consumed).toBe(false)
+      expect(coll.docs[0].consumed).toBe(false)
     })
 
     it('rejects completion without a verified record (out-of-order call)', async () => {
-      const built = build()
-      await built.service.requestOtp({ uid: 'uid-1', email: 'a@b.com' })
+      build()
+      await request('uid-1')
 
-      const result = await built.service.completeSignup({
+      const result = await completeSignup({
         uid: 'uid-1',
         phone: '07911 123456'
       })
 
       expect(result).toEqual({ status: 'invalid' })
-      expect(built.accounts.createAccount).not.toHaveBeenCalled()
+      expect(createAccount).not.toHaveBeenCalled()
     })
 
     it('rejects completion for a different uid', async () => {
-      const built = await verified()
+      await verified()
 
-      const result = await built.service.completeSignup({
+      const result = await completeSignup({
         uid: 'uid-other',
         phone: '07911 123456'
       })
@@ -305,20 +304,19 @@ describe('otp service', () => {
     })
 
     it('rejects a second completion (consumed)', async () => {
-      const built = await verified()
-      built.accounts.createAccount.mockResolvedValue({ _id: 'acc-9' })
-      await built.service.completeSignup({
-        uid: 'uid-1',
-        phone: '07911 123456'
-      })
+      await verified()
+      jest
+        .mocked(createAccount)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-9' }))
+      await completeSignup({ uid: 'uid-1', phone: '07911 123456' })
 
-      const result = await built.service.completeSignup({
+      const result = await completeSignup({
         uid: 'uid-1',
         phone: '07911 123456'
       })
 
       expect(result).toEqual({ status: 'invalid' })
-      expect(built.accounts.createAccount).toHaveBeenCalledTimes(1)
+      expect(createAccount).toHaveBeenCalledTimes(1)
     })
   })
 })

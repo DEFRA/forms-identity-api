@@ -3,7 +3,9 @@ import crypto from 'node:crypto'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
-import { OTPS_COLLECTION_NAME } from '~/src/mongo.js'
+import { OTPS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { createAccount, findByEmail } from '~/src/signin/accounts-service.js'
+import { sendOtp } from '~/src/signin/notifier.js'
 import { normaliseMobile } from '~/src/signin/phone.js'
 
 /**
@@ -36,13 +38,16 @@ const CODE_PATTERN = /^\d{6}$/
  */
 
 /**
- * @typedef {object} OtpService
- * @property {(input: { uid: string, email: string }) => Promise<object>} requestOtp - mints and delivers a code
- * @property {(input: { uid: string, code: string }) => Promise<VerifyResult>} verifyOtp - verifies a code and routes the journey
- * @property {(input: { uid: string, phone: string }) => Promise<CompleteResult>} completeSignup - creates the account after a verified code
+ * The otps collection (resolved lazily — the `db` live binding is only
+ * assigned once `prepareDb` has run)
  */
+function coll() {
+  return /** @type {Collection<OtpDocument>} */ (
+    db.collection(OTPS_COLLECTION_NAME)
+  )
+}
 
-/**
+/*
  * The sign-in OTP state machine. Every operation filters on {uid, purpose} —
  * never uid alone — so codes are isolated per interaction AND per authority.
  * Legal transitions (each a single conditional update):
@@ -50,145 +55,129 @@ const CODE_PATTERN = /^\d{6}$/
  *   (verify)   {verified:false, consumed:false} → consumed (account exists)
  *                                               | verified (no account)
  *   (complete) {verified:true, consumed:false}  → create account → consumed
- * @param {Db} db
- * @param {Notifier} notifier
- * @param {AccountsService} accounts
- * @returns {OtpService}
  */
-export function makeOtpService(db, notifier, accounts) {
-  const coll = /** @type {Collection<OtpDocument>} */ (
-    db.collection(OTPS_COLLECTION_NAME)
+
+/**
+ * Issues a 6-digit code, stores only its argon2 hash keyed by
+ * {uid, purpose} (upsert = resend semantics: one live code per authority
+ * per interaction) and delivers the plaintext via Notify
+ * @param {{ uid: string, email: string }} input
+ */
+export async function requestOtp({ uid, email }) {
+  const target = email.toLowerCase()
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
+  const codeHash = await argon2.hash(code)
+  const expireAt = new Date(Date.now() + config.get('otp.ttlSeconds') * 1000)
+
+  await coll().updateOne(
+    { uid, purpose: SIGNIN_VERIFY_EMAIL },
+    {
+      $set: {
+        target,
+        codeHash,
+        expireAt,
+        attempts: 0,
+        verified: false,
+        consumed: false
+      },
+      $setOnInsert: { createdAt: new Date() }
+    },
+    { upsert: true }
   )
 
-  /**
-   * Issues a 6-digit code, stores only its argon2 hash keyed by
-   * {uid, purpose} (upsert = resend semantics: one live code per authority
-   * per interaction) and delivers the plaintext via Notify
-   * @param {{ uid: string, email: string }} input
-   */
-  async function requestOtp({ uid, email }) {
-    const target = email.toLowerCase()
-    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
-    const codeHash = await argon2.hash(code)
-    const expireAt = new Date(Date.now() + config.get('otp.ttlSeconds') * 1000)
+  await sendOtp(target, code)
 
-    await coll.updateOne(
-      { uid, purpose: SIGNIN_VERIFY_EMAIL },
-      {
-        $set: {
-          target,
-          codeHash,
-          expireAt,
-          attempts: 0,
-          verified: false,
-          consumed: false
-        },
-        $setOnInsert: { createdAt: new Date() }
-      },
-      { upsert: true }
-    )
-
-    await notifier.sendOtp(target, code)
-
-    return {}
-  }
-
-  /**
-   * Verifies a code. Identity always derives from the STORED record's
-   * target, never the wire. One-way state machine: a verified record cannot
-   * be re-verified.
-   * @param {{ uid: string, code: string }} input
-   * @returns {Promise<VerifyResult>}
-   */
-  async function verifyOtp({ uid, code }) {
-    /** @type {VerifyResult} */
-    const fail = { status: 'invalid' }
-    const filter = {
-      uid,
-      purpose: SIGNIN_VERIFY_EMAIL,
-      verified: false,
-      consumed: false
-    }
-    const doc = await coll.findOne(filter)
-
-    if (!doc) {
-      return fail
-    }
-
-    if (doc.expireAt.getTime() < Date.now()) {
-      return { status: 'expired' }
-    }
-
-    const ok =
-      CODE_PATTERN.test(code) && (await argon2.verify(doc.codeHash, code))
-
-    if (!ok) {
-      const maxAttempts = config.get('otp.maxAttempts')
-      const updated = await coll.findOneAndUpdate(
-        filter,
-        { $inc: { attempts: 1 } },
-        { returnDocument: 'after' }
-      )
-
-      if ((updated?.attempts ?? 0) >= maxAttempts) {
-        await coll.updateOne(filter, { $set: { consumed: true } })
-      }
-
-      return fail
-    }
-
-    const account = await accounts.findByEmail(doc.target)
-
-    if (account) {
-      await coll.updateOne(filter, { $set: { consumed: true } })
-      return { status: 'signed-in', accountId: account._id }
-    }
-
-    await coll.updateOne(filter, { $set: { verified: true } })
-    return { status: 'phone-required' }
-  }
-
-  /**
-   * Completes JIT signup: only legal against a verified, unconsumed record
-   * for this uid. Account creation precedes consumption so a crash between
-   * the two self-heals (the retry finds the account and signs it in).
-   * @param {{ uid: string, phone: string }} input
-   * @returns {Promise<CompleteResult>}
-   */
-  async function completeSignup({ uid, phone }) {
-    const filter = {
-      uid,
-      purpose: SIGNIN_VERIFY_EMAIL,
-      verified: true,
-      consumed: false
-    }
-    const doc = await coll.findOne(filter)
-
-    if (!doc) {
-      return { status: 'invalid' }
-    }
-
-    const e164 = normaliseMobile(phone)
-
-    if (!e164) {
-      return { status: 'invalid-phone' }
-    }
-
-    const account = await accounts.createAccount({
-      email: doc.target,
-      phone: e164
-    })
-
-    await coll.updateOne(filter, { $set: { consumed: true } })
-
-    return { status: 'signed-in', accountId: account._id }
-  }
-
-  return { requestOtp, verifyOtp, completeSignup }
+  return {}
 }
 
 /**
- * @import { Collection, Db } from 'mongodb'
- * @import { Notifier } from '~/src/signin/notifier.js'
- * @import { AccountsService } from '~/src/signin/accounts-service.js'
+ * Verifies a code. Identity always derives from the STORED record's
+ * target, never the wire. One-way state machine: a verified record cannot
+ * be re-verified.
+ * @param {{ uid: string, code: string }} input
+ * @returns {Promise<VerifyResult>}
+ */
+export async function verifyOtp({ uid, code }) {
+  /** @type {VerifyResult} */
+  const fail = { status: 'invalid' }
+  const filter = {
+    uid,
+    purpose: SIGNIN_VERIFY_EMAIL,
+    verified: false,
+    consumed: false
+  }
+  const doc = await coll().findOne(filter)
+
+  if (!doc) {
+    return fail
+  }
+
+  if (doc.expireAt.getTime() < Date.now()) {
+    return { status: 'expired' }
+  }
+
+  const ok =
+    CODE_PATTERN.test(code) && (await argon2.verify(doc.codeHash, code))
+
+  if (!ok) {
+    const maxAttempts = config.get('otp.maxAttempts')
+    const updated = await coll().findOneAndUpdate(
+      filter,
+      { $inc: { attempts: 1 } },
+      { returnDocument: 'after' }
+    )
+
+    if ((updated?.attempts ?? 0) >= maxAttempts) {
+      await coll().updateOne(filter, { $set: { consumed: true } })
+    }
+
+    return fail
+  }
+
+  const account = await findByEmail(doc.target)
+
+  if (account) {
+    await coll().updateOne(filter, { $set: { consumed: true } })
+    return { status: 'signed-in', accountId: account._id }
+  }
+
+  await coll().updateOne(filter, { $set: { verified: true } })
+  return { status: 'phone-required' }
+}
+
+/**
+ * Completes JIT signup: only legal against a verified, unconsumed record
+ * for this uid. Account creation precedes consumption so a crash between
+ * the two self-heals (the retry finds the account and signs it in).
+ * @param {{ uid: string, phone: string }} input
+ * @returns {Promise<CompleteResult>}
+ */
+export async function completeSignup({ uid, phone }) {
+  const filter = {
+    uid,
+    purpose: SIGNIN_VERIFY_EMAIL,
+    verified: true,
+    consumed: false
+  }
+  const doc = await coll().findOne(filter)
+
+  if (!doc) {
+    return { status: 'invalid' }
+  }
+
+  const e164 = normaliseMobile(phone)
+
+  if (!e164) {
+    return { status: 'invalid-phone' }
+  }
+
+  const account = await createAccount({ email: doc.target, phone: e164 })
+
+  await coll().updateOne(filter, { $set: { consumed: true } })
+
+  return { status: 'signed-in', accountId: account._id }
+}
+
+/**
+ * @import { Collection } from 'mongodb'
  */

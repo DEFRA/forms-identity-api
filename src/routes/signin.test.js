@@ -1,33 +1,34 @@
 import Hapi from '@hapi/hapi'
 
-import { signinRoutes } from '~/src/routes/signin.js'
+import signinRoutes from '~/src/routes/signin.js'
+import { findById } from '~/src/signin/accounts-service.js'
+import {
+  completeSignup,
+  requestOtp,
+  verifyOtp
+} from '~/src/signin/otp-service.js'
 
-/** Builds a server with fake services injected */
+jest.mock('~/src/signin/otp-service.js', () => ({
+  requestOtp: jest.fn(),
+  verifyOtp: jest.fn(),
+  completeSignup: jest.fn()
+}))
+jest.mock('~/src/signin/accounts-service.js', () => ({
+  findById: jest.fn()
+}))
+
+/** Builds a server with the static routes (services are module-mocked) */
 async function buildServer() {
-  const otpService = {
-    requestOtp: jest.fn().mockResolvedValue({}),
-    verifyOtp: jest.fn().mockResolvedValue({ status: 'invalid' }),
-    completeSignup: jest.fn().mockResolvedValue({ status: 'invalid' })
-  }
-  const accountsService = {
-    findByEmail: jest.fn(),
-    findById: jest.fn().mockResolvedValue(null),
-    createAccount: jest.fn()
-  }
   const server = Hapi.server()
-  server.route(
-    signinRoutes(
-      /** @type {never} */ (otpService),
-      /** @type {never} */ (accountsService)
-    )
-  )
+  server.route(signinRoutes)
   await server.initialize()
-  return { server, otpService, accountsService }
+  return server
 }
 
 describe('signin routes', () => {
   it('POST /otp/request validates and delegates', async () => {
-    const { server, otpService } = await buildServer()
+    jest.mocked(requestOtp).mockResolvedValue({})
+    const server = await buildServer()
 
     const res = await server.inject({
       method: 'POST',
@@ -36,14 +37,14 @@ describe('signin routes', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    expect(otpService.requestOtp).toHaveBeenCalledWith({
+    expect(requestOtp).toHaveBeenCalledWith({
       uid: 'uid-1',
       email: 'a@b.com'
     })
   })
 
   it('POST /otp/request rejects an invalid email with 400', async () => {
-    const { server, otpService } = await buildServer()
+    const server = await buildServer()
 
     const res = await server.inject({
       method: 'POST',
@@ -52,15 +53,14 @@ describe('signin routes', () => {
     })
 
     expect(res.statusCode).toBe(400)
-    expect(otpService.requestOtp).not.toHaveBeenCalled()
+    expect(requestOtp).not.toHaveBeenCalled()
   })
 
   it('POST /otp/verify passes the service result through', async () => {
-    const { server, otpService } = await buildServer()
-    otpService.verifyOtp.mockResolvedValue({
-      status: 'signed-in',
-      accountId: 'acc-1'
-    })
+    jest
+      .mocked(verifyOtp)
+      .mockResolvedValue({ status: 'signed-in', accountId: 'acc-1' })
+    const server = await buildServer()
 
     const res = await server.inject({
       method: 'POST',
@@ -76,7 +76,8 @@ describe('signin routes', () => {
   })
 
   it('POST /otp/verify tolerates arbitrary code text (backend enforces)', async () => {
-    const { server } = await buildServer()
+    jest.mocked(verifyOtp).mockResolvedValue({ status: 'invalid' })
+    const server = await buildServer()
 
     const res = await server.inject({
       method: 'POST',
@@ -89,11 +90,10 @@ describe('signin routes', () => {
   })
 
   it('POST /accounts delegates to completeSignup', async () => {
-    const { server, otpService } = await buildServer()
-    otpService.completeSignup.mockResolvedValue({
-      status: 'signed-in',
-      accountId: 'acc-2'
-    })
+    jest
+      .mocked(completeSignup)
+      .mockResolvedValue({ status: 'signed-in', accountId: 'acc-2' })
+    const server = await buildServer()
 
     const res = await server.inject({
       method: 'POST',
@@ -102,18 +102,19 @@ describe('signin routes', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    expect(otpService.completeSignup).toHaveBeenCalledWith({
+    expect(completeSignup).toHaveBeenCalledWith({
       uid: 'uid-1',
       phone: '07911 123456'
     })
   })
 
   it('GET /accounts/{id} returns claims data or 404', async () => {
-    const { server, accountsService } = await buildServer()
-    accountsService.findById.mockResolvedValue({
-      _id: 'acc-1',
-      email: 'a@b.com'
-    })
+    jest
+      .mocked(findById)
+      .mockResolvedValue(
+        /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
+      )
+    const server = await buildServer()
 
     const found = await server.inject({
       method: 'GET',
@@ -125,7 +126,7 @@ describe('signin routes', () => {
       email: 'a@b.com'
     })
 
-    accountsService.findById.mockResolvedValue(null)
+    jest.mocked(findById).mockResolvedValue(null)
     const missing = await server.inject({
       method: 'GET',
       url: '/accounts/nope'

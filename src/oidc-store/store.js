@@ -1,4 +1,4 @@
-import { GRANTABLE_COLLECTION_NAMES } from '~/src/mongo.js'
+import { GRANTABLE_COLLECTION_NAMES, db } from '~/src/mongo.js'
 
 /**
  * Wire-level model names (snake_cased collection names). The routes validate
@@ -30,91 +30,86 @@ function strip(doc) {
   return rest
 }
 
-/**
+/*
  * Mongo persistence for oidc-provider artifacts, exposed to the UI's HTTP
  * adapter via routes. One collection per model; `_id` is the model's string
  * id; `expiresIn` (seconds) becomes an `expireAt` Date the TTL index
- * garbage-collects (expiry correctness stays in oidc-provider).
- * @param {Db} db
+ * garbage-collects (expiry correctness stays in oidc-provider). Collections
+ * resolve lazily — the `db` live binding is only assigned once `prepareDb`
+ * has run.
  */
-export function makeOidcStore(db) {
-  /** @param {string} model */
-  function coll(model) {
-    return db.collection(model)
+
+/**
+ * @param {string} model
+ * @param {string} id
+ * @param {Record<string, unknown>} payload
+ * @param {number} [expiresIn]
+ */
+export async function upsert(model, id, payload, expiresIn) {
+  /** @type {Record<string, unknown>} */
+  const doc = { ...payload }
+
+  if (expiresIn) {
+    doc.expireAt = new Date(Date.now() + expiresIn * 1000)
   }
 
-  return {
-    /**
-     * @param {string} model
-     * @param {string} id
-     * @param {Record<string, unknown>} payload
-     * @param {number} [expiresIn]
-     */
-    async upsert(model, id, payload, expiresIn) {
-      /** @type {Record<string, unknown>} */
-      const doc = { ...payload }
-
-      if (expiresIn) {
-        doc.expireAt = new Date(Date.now() + expiresIn * 1000)
-      }
-
-      await coll(model).updateOne(
-        { _id: /** @type {never} */ (id) },
-        { $set: doc },
-        { upsert: true }
-      )
-    },
-
-    /**
-     * @param {string} model
-     * @param {string} id
-     */
-    async find(model, id) {
-      const doc = await coll(model).findOne({ _id: /** @type {never} */ (id) })
-      return doc ? strip(doc) : undefined
-    },
-
-    /**
-     * @param {string} model
-     * @param {string} uid
-     */
-    async findByUid(model, uid) {
-      const doc = await coll(model).findOne({ uid })
-      return doc ? strip(doc) : undefined
-    },
-
-    /**
-     * @param {string} model
-     * @param {string} id
-     */
-    async consume(model, id) {
-      await coll(model).updateOne(
-        { _id: /** @type {never} */ (id) },
-        { $set: { consumed: Math.floor(Date.now() / 1000) } }
-      )
-    },
-
-    /**
-     * @param {string} model
-     * @param {string} id
-     */
-    async destroy(model, id) {
-      await coll(model).deleteOne({ _id: /** @type {never} */ (id) })
-    },
-
-    /**
-     * @param {string} grantId
-     */
-    async revokeByGrantId(grantId) {
-      await Promise.all(
-        GRANTABLE_COLLECTION_NAMES.map((name) =>
-          db.collection(name).deleteMany({ grantId })
-        )
-      )
-    }
-  }
+  await db
+    .collection(model)
+    .updateOne(
+      { _id: /** @type {never} */ (id) },
+      { $set: doc },
+      { upsert: true }
+    )
 }
 
 /**
- * @import { Db } from 'mongodb'
+ * @param {string} model
+ * @param {string} id
  */
+export async function find(model, id) {
+  const doc = await db
+    .collection(model)
+    .findOne({ _id: /** @type {never} */ (id) })
+  return doc ? strip(doc) : undefined
+}
+
+/**
+ * @param {string} model
+ * @param {string} uid
+ */
+export async function findByUid(model, uid) {
+  const doc = await db.collection(model).findOne({ uid })
+  return doc ? strip(doc) : undefined
+}
+
+/**
+ * @param {string} model
+ * @param {string} id
+ */
+export async function consume(model, id) {
+  await db
+    .collection(model)
+    .updateOne(
+      { _id: /** @type {never} */ (id) },
+      { $set: { consumed: Math.floor(Date.now() / 1000) } }
+    )
+}
+
+/**
+ * @param {string} model
+ * @param {string} id
+ */
+export async function destroy(model, id) {
+  await db.collection(model).deleteOne({ _id: /** @type {never} */ (id) })
+}
+
+/**
+ * @param {string} grantId
+ */
+export async function revokeByGrantId(grantId) {
+  await Promise.all(
+    GRANTABLE_COLLECTION_NAMES.map((name) =>
+      db.collection(name).deleteMany({ grantId })
+    )
+  )
+}
