@@ -4,6 +4,7 @@ import signinRoutes from '~/src/routes/signin.js'
 import {
   completeSignup,
   findAccountById,
+  findSigninEmail,
   requestOtp,
   verifyOtp
 } from '~/src/services/signin-service.js'
@@ -12,7 +13,8 @@ jest.mock('~/src/services/signin-service.js', () => ({
   requestOtp: jest.fn(),
   verifyOtp: jest.fn(),
   completeSignup: jest.fn(),
-  findAccountById: jest.fn()
+  findAccountById: jest.fn(),
+  findSigninEmail: jest.fn()
 }))
 
 /** Builds a server with the static routes (services are module-mocked) */
@@ -131,6 +133,17 @@ describe('signin routes', () => {
       uid: 'uid-1',
       phone: '07911 123456'
     })
+  })
+
+  it('GET /otp/{uid} returns the display email', async () => {
+    jest.mocked(findSigninEmail).mockResolvedValue('a@b.com')
+    const server = await buildServer()
+
+    const res = await server.inject({ method: 'GET', url: '/otp/uid-1' })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({ email: 'a@b.com' })
+    expect(findSigninEmail).toHaveBeenCalledWith('uid-1')
   })
 
   it('GET /accounts/{id} returns claims data or 404', async () => {

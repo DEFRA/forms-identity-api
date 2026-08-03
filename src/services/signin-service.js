@@ -194,6 +194,26 @@ export async function createAccount({ email, phone }) {
 }
 
 /**
+ * The email a sign-in code was sent to — display data for the
+ * check-your-email page, read from the stored record (the source of truth
+ * verification also uses)
+ * @param {string} uid
+ * @throws {Boom.Boom} notFound when no code has been requested for the interaction
+ */
+export async function findSigninEmail(uid) {
+  const doc = await otpsRepository.findOne({
+    uid,
+    purpose: SIGNIN_VERIFY_EMAIL
+  })
+
+  if (!doc) {
+    throw Boom.notFound('No sign-in code for this interaction')
+  }
+
+  return doc.target
+}
+
+/**
  * Account lookup backing the provider's userinfo/claims
  * @param {string} id
  * @throws {Boom.Boom} notFound when no account exists for the id

@@ -4,6 +4,7 @@ import { joi as telephoneJoi } from '~/src/lib/telephone.js'
 import {
   completeSignup,
   findAccountById,
+  findSigninEmail,
   requestOtp,
   verifyOtp
 } from '~/src/services/signin-service.js'
@@ -78,6 +79,20 @@ export default /** @type {ServerRoute[]} */ ([
         request.payload
       )
       return completeSignup({ uid, phone })
+    }
+  },
+  {
+    method: 'GET',
+    path: '/otp/{uid}',
+    options: {
+      validate: {
+        params: Joi.object({ uid: Joi.string().required() })
+      }
+    },
+    async handler(request) {
+      const uid = /** @type {string} */ (request.params.uid)
+
+      return { email: await findSigninEmail(uid) }
     }
   },
   {

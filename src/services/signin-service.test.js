@@ -9,6 +9,7 @@ import {
   completeSignup,
   createAccount,
   findAccountById,
+  findSigninEmail,
   requestOtp,
   verifyOtp
 } from '~/src/services/signin-service.js'
@@ -425,6 +426,25 @@ describe('signin service', () => {
       const result = await verifyOtp({ uid: 'uid-1', code: codeA })
 
       expect(result).toEqual({ status: 'invalid' })
+    })
+  })
+
+  describe('findSigninEmail', () => {
+    it('returns the stored target for the interaction', async () => {
+      build()
+      await request('uid-1', 'Someone@Example.com')
+
+      await expect(findSigninEmail('uid-1')).resolves.toBe(
+        'someone@example.com'
+      )
+    })
+
+    it('throws Boom.notFound when no code was requested', async () => {
+      build()
+
+      await expect(findSigninEmail('uid-none')).rejects.toThrow(
+        Boom.notFound('No sign-in code for this interaction')
+      )
     })
   })
 })
