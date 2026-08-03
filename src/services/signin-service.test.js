@@ -1,11 +1,11 @@
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
+import { PURPOSE } from '~/src/constants.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import {
-  SIGNIN_VERIFY_EMAIL,
   completeSignup,
   createAccount,
   findAccountById,
@@ -116,7 +116,7 @@ describe('signin service', () => {
       const code = lastSentCode()
       const doc = docs[0]
       expect(doc.uid).toBe('uid-1')
-      expect(doc.purpose).toBe(SIGNIN_VERIFY_EMAIL)
+      expect(doc.purpose).toBe(PURPOSE.SIGNIN_VERIFY_EMAIL)
       expect(doc.target).toBe('a@b.com')
       expect(doc.consumed).toBe(false)
       expect(doc.verified).toBe(false)

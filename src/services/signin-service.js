@@ -4,33 +4,14 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
+import { PURPOSE } from '~/src/constants.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
-/**
- * The single OTP purpose in this story: proof of email control for sign-in.
- * Purpose values are JOURNEY_CHALLENGE — they name the authority granted,
- * never the journey alone or the challenge alone (see the spec's purpose
- * naming rule).
- */
-export const SIGNIN_VERIFY_EMAIL = 'SIGNIN_VERIFY_EMAIL'
-
-/**
- * @typedef {{ status: 'invalid' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
- * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
- */
-
-/*
- * The sign-in OTP state machine. Every operation filters on {uid, purpose} —
- * never uid alone — so codes are isolated per interaction AND per authority.
- * Legal transitions (each a single conditional update):
- *   (request)  upsert: fresh hash, attempts 0, verified false, consumed false
- *   (verify)   {verified:false, consumed:false} → consumed (account exists)
- *                                               | verified (no account)
- *   (complete) {verified:true, consumed:false}  → create account → consumed
- */
+// Every OTP operation filters on {uid, purpose} — never uid alone — so codes
+// are isolated per interaction and per purpose.
 
 /**
  * Issues a 6-digit code, stores only its argon2 hash keyed by
@@ -45,7 +26,7 @@ export async function requestOtp({ uid, email }) {
   const expireAt = new Date(Date.now() + config.get('otp.ttlSeconds') * 1000)
 
   await otpsRepository.upsert(
-    { uid, purpose: SIGNIN_VERIFY_EMAIL },
+    { uid, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
     {
       target,
       codeHash,
@@ -90,7 +71,7 @@ export async function verifyOtp({ uid, code }) {
   const fail = { status: 'invalid' }
   const filter = {
     uid,
-    purpose: SIGNIN_VERIFY_EMAIL,
+    purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
     verified: false,
     consumed: false
   }
@@ -151,7 +132,7 @@ export async function verifyOtp({ uid, code }) {
 export async function completeSignup({ uid, phone }) {
   const filter = {
     uid,
-    purpose: SIGNIN_VERIFY_EMAIL,
+    purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
     verified: true,
     consumed: false
   }
@@ -220,7 +201,7 @@ export async function createAccount({ email, phone }) {
 export async function findSigninEmail(uid) {
   const doc = await otpsRepository.findOne({
     uid,
-    purpose: SIGNIN_VERIFY_EMAIL
+    purpose: PURPOSE.SIGNIN_VERIFY_EMAIL
   })
 
   if (!doc) {
@@ -244,3 +225,8 @@ export async function findAccountById(id) {
 
   return account
 }
+
+/**
+ * @typedef {{ status: 'invalid' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
+ * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
+ */
