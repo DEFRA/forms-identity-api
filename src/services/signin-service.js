@@ -106,11 +106,15 @@ export async function verifyOtp({ uid, code }) {
   const account = await accountsRepository.findByEmail(doc.target)
 
   if (account) {
-    await otpsRepository.update(filter, { consumed: true })
+    if (!(await otpsRepository.update(filter, { consumed: true }))) {
+      return fail // a concurrent request already spent this code
+    }
     return { status: 'signed-in', accountId: account._id }
   }
 
-  await otpsRepository.update(filter, { verified: true })
+  if (!(await otpsRepository.update(filter, { verified: true }))) {
+    return fail
+  }
   return { status: 'phone-required' }
 }
 
@@ -142,7 +146,9 @@ export async function completeSignup({ uid, phone }) {
 
   const account = await createAccount({ email: doc.target, phone: e164 })
 
-  await otpsRepository.update(filter, { consumed: true })
+  if (!(await otpsRepository.update(filter, { consumed: true }))) {
+    return { status: 'invalid' } // a concurrent submit already completed
+  }
 
   return { status: 'signed-in', accountId: account._id }
 }

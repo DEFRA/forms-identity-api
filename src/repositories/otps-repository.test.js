@@ -54,15 +54,19 @@ describe('otps repository', () => {
     )
   })
 
-  it('update sets fields against the filter', async () => {
+  it('update sets fields and reports whether a record matched', async () => {
     const coll = fakeColl()
-    coll.updateOne.mockResolvedValue({})
+    coll.updateOne.mockResolvedValue({ matchedCount: 1 })
 
-    await update({ uid: 'u-1' }, { consumed: true })
-
+    await expect(update({ uid: 'u-1' }, { consumed: true })).resolves.toBe(true)
     expect(coll.updateOne).toHaveBeenCalledWith(
       { uid: 'u-1' },
       { $set: { consumed: true } }
+    )
+
+    coll.updateOne.mockResolvedValue({ matchedCount: 0 })
+    await expect(update({ uid: 'gone' }, { consumed: true })).resolves.toBe(
+      false
     )
   })
 

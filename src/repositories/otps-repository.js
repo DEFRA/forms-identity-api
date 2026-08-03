@@ -46,11 +46,16 @@ export async function upsert(key, fields) {
 }
 
 /**
+ * Applies fields to the matching record. The boolean return is the atomic
+ * claim signal for one-way state transitions: false means the filter no
+ * longer matched, i.e. a concurrent request already moved the state.
  * @param {Filter<OtpDocument>} filter
  * @param {MatchKeysAndValues<OtpDocument>} fields
+ * @returns {Promise<boolean>} whether a record matched
  */
 export async function update(filter, fields) {
-  await coll().updateOne(filter, { $set: fields })
+  const { matchedCount } = await coll().updateOne(filter, { $set: fields })
+  return matchedCount > 0
 }
 
 /**

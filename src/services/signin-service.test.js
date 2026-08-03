@@ -65,7 +65,7 @@ function build() {
     if (doc) {
       Object.assign(doc, fields)
     }
-    return Promise.resolve()
+    return Promise.resolve(Boolean(doc))
   })
   jest.mocked(otpsRepository.incrementAttempts).mockImplementation((filter) => {
     const doc = match(filter)
@@ -361,6 +361,49 @@ describe('signin service', () => {
       await expect(findAccountById('gone')).rejects.toThrow(
         Boom.notFound('Account not found')
       )
+    })
+  })
+
+  describe('transition races', () => {
+    it('verify returns invalid when a concurrent request spends the code first', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-1' }))
+      const code = await request('uid-1')
+      jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
+
+      const result = await verifyOtp({ uid: 'uid-1', code })
+
+      expect(result).toEqual({ status: 'invalid' })
+    })
+
+    it('verify returns invalid when a concurrent request verifies first', async () => {
+      build()
+      const code = await request('uid-1')
+      jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
+
+      const result = await verifyOtp({ uid: 'uid-1', code })
+
+      expect(result).toEqual({ status: 'invalid' })
+    })
+
+    it('completeSignup returns invalid when a concurrent submit completes first', async () => {
+      const docs = build()
+      const code = await request('uid-1')
+      await verifyOtp({ uid: 'uid-1', code })
+      jest
+        .mocked(accountsRepository.insert)
+        .mockImplementation((account) => Promise.resolve(account))
+      jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
+
+      const result = await completeSignup({
+        uid: 'uid-1',
+        phone: '07911 123456'
+      })
+
+      expect(result).toEqual({ status: 'invalid' })
+      expect(docs[0].verified).toBe(true)
     })
   })
 })
