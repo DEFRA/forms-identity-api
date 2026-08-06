@@ -1,3 +1,4 @@
+import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import {
@@ -9,6 +10,9 @@ import {
   revokeByGrantId,
   upsert
 } from '~/src/repositories/oidc-repository.js'
+
+/** One artefact by model and id — the same address for read, write and delete */
+const MODEL_ID_PATH = '/oidc/{model}/{id}'
 
 const modelParam = Joi.string()
   .valid(...MODEL_COLLECTIONS)
@@ -30,7 +34,7 @@ const modelIdParams = Joi.object({
 export default [
   {
     method: 'PUT',
-    path: '/oidc/{model}/{id}',
+    path: MODEL_ID_PATH,
     options: {
       validate: {
         params: modelIdParams,
@@ -45,12 +49,12 @@ export default [
       const { model, id } = request.params
       const { payload, expiresIn } = request.payload
       await upsert(model, id, payload, expiresIn)
-      return h.response().code(204)
+      return h.response().code(StatusCodes.NO_CONTENT)
     }
   },
   {
     method: 'GET',
-    path: '/oidc/{model}/{id}',
+    path: MODEL_ID_PATH,
     options: { validate: { params: modelIdParams } },
     /** @param {ModelIdRequest} request */
     handler(request) {
@@ -80,7 +84,7 @@ export default [
     async handler(request, h) {
       const { model, id } = request.params
       await consume(model, id)
-      return h.response().code(204)
+      return h.response().code(StatusCodes.NO_CONTENT)
     }
   },
   {
@@ -92,18 +96,18 @@ export default [
     /** @param {GrantIdRequest} request */
     async handler(request, h) {
       await revokeByGrantId(request.params.grantId)
-      return h.response().code(204)
+      return h.response().code(StatusCodes.NO_CONTENT)
     }
   },
   {
     method: 'DELETE',
-    path: '/oidc/{model}/{id}',
+    path: MODEL_ID_PATH,
     options: { validate: { params: modelIdParams } },
     /** @param {ModelIdRequest} request */
     async handler(request, h) {
       const { model, id } = request.params
       await destroy(model, id)
-      return h.response().code(204)
+      return h.response().code(StatusCodes.NO_CONTENT)
     }
   }
 ]

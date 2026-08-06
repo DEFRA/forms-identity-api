@@ -38,10 +38,10 @@ export function findOne(filter) {
  * @param {MatchKeysAndValues<OtpDocument>} fields
  */
 export async function upsert(key, fields) {
-  const update = { $set: fields, $setOnInsert: { createdAt: new Date() } }
+  const changes = { $set: fields, $setOnInsert: { createdAt: new Date() } }
 
   try {
-    await coll().updateOne(key, update, { upsert: true })
+    await coll().updateOne(key, changes, { upsert: true })
   } catch (err) {
     // Two concurrent upserts for a fresh key can both take the insert path,
     // and the unique {uid, purpose} index rejects one — retrying lands the
@@ -49,7 +49,7 @@ export async function upsert(key, fields) {
     if (!isDuplicateKeyError(err)) {
       throw err
     }
-    await coll().updateOne(key, update, { upsert: true })
+    await coll().updateOne(key, changes, { upsert: true })
   }
 }
 

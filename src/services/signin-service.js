@@ -10,6 +10,10 @@ import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
+/** Digits in a one-time code, and the range that produces exactly that many */
+const CODE_LENGTH = 6
+const CODE_RANGE = 10 ** CODE_LENGTH
+
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
 const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
 const OTP_EXPIRY_MINUTES = Math.round(OTP_TTL_SECONDS / 60)
@@ -27,7 +31,10 @@ const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
  */
 export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
-  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0')
+  const code = String(crypto.randomInt(0, CODE_RANGE)).padStart(
+    CODE_LENGTH,
+    '0'
+  )
   const codeHash = await argon2.hash(code)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
 
