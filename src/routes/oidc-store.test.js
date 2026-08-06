@@ -31,6 +31,26 @@ async function buildServer() {
 }
 
 describe('oidc store routes', () => {
+  it('stores replay_detection, which private_key_jwt client auth depends on', async () => {
+    // the provider records each client assertion's jti here to refuse a
+    // replay; rejecting the model breaks every token request
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/oidc/replay_detection/jti-1',
+      payload: { payload: { iss: 'runner' }, expiresIn: 60 }
+    })
+
+    expect(res.statusCode).toBe(204)
+    expect(upsert).toHaveBeenCalledWith(
+      'replay_detection',
+      'jti-1',
+      { iss: 'runner' },
+      60
+    )
+  })
+
   it('rejects models outside the allowlist with 400 on every route', async () => {
     // The allowlist is what stops these routes reading or writing arbitrary
     // collections — `accounts` is exactly the collection they must never reach
