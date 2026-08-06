@@ -11,6 +11,12 @@ import { client, prepareDb } from '~/src/mongo.js'
 export const MONGO_VERSION = '6.0.14'
 
 /**
+ * Booting mongod can include downloading the binary on a cold cache, which is
+ * far slower than jest's default timeout allows for.
+ */
+export const MONGO_BOOT_TIMEOUT_MS = 180_000
+
+/**
  * Boots an in-memory mongod (a real MongoDB binary backed by in-memory
  * storage) and points the app config at it, so integration suites run against
  * genuine Mongo semantics: unique indexes, atomic filtered updates and
@@ -40,7 +46,7 @@ export function setupIntegrationDb() {
   beforeAll(async () => {
     mongod = await startMongoMemoryServer()
     await prepareDb(/** @type {never} */ ({ info: () => undefined }))
-  }, 180_000)
+  }, MONGO_BOOT_TIMEOUT_MS)
 
   afterAll(async () => {
     await client.close()

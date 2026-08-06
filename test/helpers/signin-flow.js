@@ -1,3 +1,5 @@
+import { StatusCodes } from 'http-status-codes'
+
 import { createServer } from '~/src/api/server.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import {
@@ -6,7 +8,16 @@ import {
   client,
   db
 } from '~/src/mongo.js'
-import { startMongoMemoryServer } from '~/test/helpers/mongo-memory.js'
+import {
+  MONGO_BOOT_TIMEOUT_MS,
+  startMongoMemoryServer
+} from '~/test/helpers/mongo-memory.js'
+
+/** The code from the most recent Notify email */
+function lastSentCode() {
+  const personalisation = jest.mocked(sendEmail).mock.calls.at(-1)?.[2]
+  return String(personalisation?.code)
+}
 
 /**
  * Registers suite lifecycle hooks that boot the real Hapi server (including
@@ -28,7 +39,7 @@ export function setupSigninFlow() {
     mongod = await startMongoMemoryServer()
     server = await createServer()
     await server.initialize()
-  }, 180_000)
+  }, MONGO_BOOT_TIMEOUT_MS)
 
   afterEach(() =>
     Promise.all(
@@ -50,12 +61,6 @@ export function setupSigninFlow() {
    */
   const inject = (options) => server.inject(options)
 
-  /** The code from the most recent Notify email */
-  function lastSentCode() {
-    const personalisation = jest.mocked(sendEmail).mock.calls.at(-1)?.[2]
-    return String(personalisation?.code)
-  }
-
   /**
    * Requests a sign-in code over HTTP and returns the code that "was emailed"
    * @param {string} uid
@@ -66,7 +71,7 @@ export function setupSigninFlow() {
       url: '/otp/request',
       payload: { uid, email }
     })
-    expect(res.statusCode).toBe(204)
+    expect(res.statusCode).toBe(StatusCodes.NO_CONTENT)
     return lastSentCode()
   }
 
@@ -82,7 +87,7 @@ export function setupSigninFlow() {
       url: '/otp/verify',
       payload: { uid, code }
     })
-    expect(res.statusCode).toBe(200)
+    expect(res.statusCode).toBe(StatusCodes.OK)
     return JSON.parse(res.payload)
   }
 
