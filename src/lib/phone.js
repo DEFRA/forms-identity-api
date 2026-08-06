@@ -11,8 +11,7 @@ const MOBILE_TYPES = new Set([
 
 /**
  * Validates a mobile number (UK default region, international accepted) and
- * normalises it to E.164 — the same google-libphonenumber validation the
- * forms phone component uses
+ * normalises it to E.164
  * @param {string} input
  * @returns {string} the number in E.164 format
  * @throws {Error} when the input is not a valid mobile number
