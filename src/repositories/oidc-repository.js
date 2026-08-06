@@ -1,6 +1,10 @@
 import Boom from '@hapi/boom'
 
-import { GRANTABLE_COLLECTION_NAMES, db } from '~/src/mongo.js'
+import {
+  GRANTABLE_COLLECTION_NAMES,
+  OIDC_COLLECTION_NAMES,
+  db
+} from '~/src/mongo.js'
 
 /**
  * Wire-level model names (snake_cased collection names). The routes validate
@@ -10,16 +14,7 @@ import { GRANTABLE_COLLECTION_NAMES, db } from '~/src/mongo.js'
  * device flow, CIBA, PAR); a missing model fails loudly as a 400 on the
  * feature's first use.
  */
-export const MODEL_COLLECTIONS = [
-  'session',
-  'interaction',
-  'grant',
-  'authorization_code',
-  'access_token',
-  // one row per client assertion id, so a captured assertion cannot be
-  // replayed within its lifetime — required by private_key_jwt client auth
-  'replay_detection'
-]
+export const MODEL_COLLECTIONS = OIDC_COLLECTION_NAMES
 
 /*
  * Mongo persistence for oidc-provider artifacts, exposed to forms-identity-ui

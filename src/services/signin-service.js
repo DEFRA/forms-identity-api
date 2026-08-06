@@ -10,9 +10,15 @@ import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
-/** Digits in a one-time code, and the range that produces exactly that many */
+/**
+ * One-time codes span the whole six digit range except those starting with a
+ * zero, which a citizen reading "012345" could reasonably type as "12345".
+ * That costs a tenth of the keyspace, immaterial against a five attempt
+ * lockout and a fifteen minute life.
+ */
 const CODE_LENGTH = 6
-const CODE_RANGE = 10 ** CODE_LENGTH
+const CODE_MIN = 10 ** (CODE_LENGTH - 1)
+const CODE_MAX_EXCLUSIVE = 10 ** CODE_LENGTH
 
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
 const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
@@ -31,10 +37,7 @@ const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
  */
 export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
-  const code = String(crypto.randomInt(0, CODE_RANGE)).padStart(
-    CODE_LENGTH,
-    '0'
-  )
+  const code = String(crypto.randomInt(CODE_MIN, CODE_MAX_EXCLUSIVE))
   const codeHash = await argon2.hash(code)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
 
