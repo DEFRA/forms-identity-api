@@ -93,18 +93,7 @@ export async function verifyOtp(uid, code) {
   }
   const doc = await otpsRepository.findOne(filter)
 
-  // Mongo TTL is lazy and isn't evaluated in real time. Double check the
-  // expiry in-app in case it hasn't been dropped yet - this is security
-  // related, we need to be sure.
-  const isExpired = doc ? doc.expireAt.getTime() < Date.now() : false
-
-  // Likewise the attempt budget. Reaching it marks the record used below, but
-  // that write can fail or be cut short by a crash, and a lockout that only
-  // holds when the last write succeeded is no lockout at all. The count is
-  // the authority; marking it used is the tidy-up.
-  const isSpent = doc ? doc.attempts >= OTP_MAX_ATTEMPTS : false
-
-  if (!doc || isExpired || isSpent) {
+  if (!doc || !isGuessable(doc)) {
     return fail
   }
 
@@ -116,12 +105,7 @@ export async function verifyOtp(uid, code) {
   const ok = await argon2.verify(doc.codeHash, code)
 
   if (!ok) {
-    const updated = await otpsRepository.incrementAttempts(claim)
-    const attempts = updated?.attempts ?? 0
-
-    if (attempts >= OTP_MAX_ATTEMPTS) {
-      await otpsRepository.update(claim, { consumed: true })
-    }
+    await spendAttempt(claim)
 
     return fail
   }
@@ -145,6 +129,42 @@ export async function verifyOtp(uid, code) {
   }
 
   return { status: STATUS.PHONE_REQUIRED }
+}
+
+/**
+ * Whether a record that was just read is still open to a guess.
+ *
+ * Mongo TTL is lazy and isn't evaluated in real time. Double check the
+ * expiry in-app in case it hasn't been dropped yet - this is security
+ * related, we need to be sure.
+ *
+ * Likewise the attempt budget. Reaching it marks the record used, but that
+ * write can fail or be cut short by a crash, and a lockout that only holds
+ * when the last write succeeded is no lockout at all. The count is the
+ * authority; marking it used is the tidy-up.
+ * @param {OtpDocument} doc
+ */
+function isGuessable(doc) {
+  const isExpired = doc.expireAt.getTime() < Date.now()
+  const isSpent = doc.attempts >= OTP_MAX_ATTEMPTS
+
+  return !isExpired && !isSpent
+}
+
+/**
+ * Spends one attempt against the exact record version that was read. Hitting
+ * the budget marks the record used, which is the tidy-up rather than the
+ * lockout — isGuessable reads the count on the next attempt and is what
+ * actually holds the door shut.
+ * @param {Filter<OtpDocument>} claim
+ */
+async function spendAttempt(claim) {
+  const updated = await otpsRepository.incrementAttempts(claim)
+  const attempts = updated?.attempts ?? 0
+
+  if (attempts >= OTP_MAX_ATTEMPTS) {
+    await otpsRepository.update(claim, { consumed: true })
+  }
 }
 
 /**
@@ -257,7 +277,9 @@ export async function findAccountById(id) {
 }
 
 /**
+ * @import { Filter } from 'mongodb'
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
+ * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
  * @typedef {{ status: 'invalid' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */
