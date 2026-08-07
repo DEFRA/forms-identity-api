@@ -125,23 +125,27 @@ describe('signin service', () => {
       await expect(argon2.verify(doc.codeHash, code)).resolves.toBe(true)
     })
 
-    it('never issues a code with a leading zero', async () => {
-      // a citizen reading "012345" may well type "12345", so the range starts
-      // at the first six digit number rather than at zero. Hashing is stubbed
-      // here only because argon2 is deliberately slow, not to fake the code.
+    it('issues six digit codes across the whole range, zeros included', async () => {
+      // the leading zero is part of the code: it is what gets hashed and what
+      // the email shows. Hashing is stubbed only because argon2 is slow.
       const hash = jest
         .spyOn(argon2, 'hash')
         .mockResolvedValue('$argon2id$stub')
+      let sawLeadingZero = false
 
       try {
         for (let attempt = 0; attempt < 500; attempt++) {
           build()
           await requestOtp('uid-1', 'a@b.com')
-          expect(lastSentCode()).toMatch(/^[1-9]\d{5}$/)
+          const code = lastSentCode()
+          expect(code).toMatch(/^\d{6}$/)
+          sawLeadingZero ||= code.startsWith('0')
         }
       } finally {
         hash.mockRestore()
       }
+
+      expect(sawLeadingZero).toBe(true)
     })
   })
 

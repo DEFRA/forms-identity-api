@@ -1,3 +1,5 @@
+import crypto from 'node:crypto'
+
 import {
   ACCOUNTS_COLLECTION_NAME,
   OTPS_COLLECTION_NAME,
@@ -11,6 +13,46 @@ jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 const { inject, requestCode, verify } = setupSigninFlow()
 
 describe('citizen sign-in journeys', () => {
+  it('accepts a code whose leading zeros are part of it', async () => {
+    // the low end of the range is padded, not skipped, so the citizen is
+    // emailed "000001" and has to type all six characters back
+    const randomInt = jest
+      .spyOn(crypto, 'randomInt')
+      .mockReturnValue(/** @type {never} */ (1))
+    const code = await requestCode('uid-padded')
+    randomInt.mockRestore()
+
+    expect(code).toBe('000001')
+    expect(await verify('uid-padded', code)).toEqual({
+      status: 'phone-required'
+    })
+  })
+
+  it('refuses the same code typed without its leading zeros', async () => {
+    // we never pad on a citizen's behalf: "1" is not "000001", it is a code
+    // of the wrong shape and is turned away before the service sees it
+    const randomInt = jest
+      .spyOn(crypto, 'randomInt')
+      .mockReturnValue(/** @type {never} */ (1))
+    const code = await requestCode('uid-shortform')
+    randomInt.mockRestore()
+
+    expect(code).toBe('000001')
+
+    const res = await inject({
+      method: 'POST',
+      url: '/otp/verify',
+      payload: { uid: 'uid-shortform', code: '1' }
+    })
+
+    expect(res.statusCode).toBe(400)
+
+    // and the real code still works afterwards — the attempt was not spent
+    expect(await verify('uid-shortform', code)).toEqual({
+      status: 'phone-required'
+    })
+  })
+
   it('signs a new user up end to end, with four fumbled attempts on the way', async () => {
     const code = await requestCode('uid-signup', 'Citizen@Example.com')
 

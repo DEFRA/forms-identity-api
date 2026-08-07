@@ -11,13 +11,12 @@ import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
 /**
- * One-time codes span the whole six digit range except those starting with a
- * zero, which a citizen reading "012345" could reasonably type as "12345".
- * That costs a tenth of the keyspace, immaterial against a five attempt
- * lockout and a fifteen minute life.
+ * One-time codes are always six digits, zero-padded, so the value 1 is issued,
+ * hashed, emailed and typed as "000001". The padding is part of the code
+ * rather than a display choice, which keeps the whole million-value range in
+ * use and means the code the citizen reads is the code we stored.
  */
 const CODE_LENGTH = 6
-const CODE_MIN = 10 ** (CODE_LENGTH - 1)
 const CODE_MAX_EXCLUSIVE = 10 ** CODE_LENGTH
 
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
@@ -37,7 +36,10 @@ const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
  */
 export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
-  const code = String(crypto.randomInt(CODE_MIN, CODE_MAX_EXCLUSIVE))
+  const code = String(crypto.randomInt(0, CODE_MAX_EXCLUSIVE)).padStart(
+    CODE_LENGTH,
+    '0'
+  )
   const codeHash = await argon2.hash(code)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
 
