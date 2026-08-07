@@ -1,5 +1,7 @@
 import {
   ACCOUNTS_COLLECTION_NAME,
+  GRANTABLE_COLLECTION_NAMES,
+  OIDC_COLLECTION_NAMES,
   OTPS_COLLECTION_NAME,
   db
 } from '~/src/mongo.js'
@@ -23,20 +25,31 @@ describe('startup indexes', () => {
     )
   })
 
-  it('gives otps and every oidc artifact collection a TTL sweeper', async () => {
-    for (const name of [OTPS_COLLECTION_NAME, 'session', 'access_token']) {
+  // iterating the lists rather than a sample: a model added to one of them
+  // without its index fails here rather than accumulating records forever
+  it.each([OTPS_COLLECTION_NAME, ...OIDC_COLLECTION_NAMES])(
+    'gives %s a TTL sweeper',
+    async (name) => {
       expect(await indexesOf(name)).toContainEqual(
         expect.objectContaining({ key: { expireAt: 1 }, expireAfterSeconds: 0 })
       )
     }
-  })
+  )
 
-  it('indexes the nested oidc lookup keys', async () => {
+  it.each(GRANTABLE_COLLECTION_NAMES)(
+    'indexes %s by the grant it was issued under',
+    async (name) => {
+      expect(await indexesOf(name)).toContainEqual(
+        expect.objectContaining({ key: { 'payload.grantId': 1 } })
+      )
+    }
+  )
+
+  it('indexes sessions by uid, uniquely', async () => {
+    // the provider generates a session uid per sign-in, so a collision is a
+    // fault worth failing on rather than quietly storing twice
     expect(await indexesOf('session')).toContainEqual(
-      expect.objectContaining({ key: { 'payload.uid': 1 } })
-    )
-    expect(await indexesOf('access_token')).toContainEqual(
-      expect.objectContaining({ key: { 'payload.grantId': 1 } })
+      expect.objectContaining({ key: { 'payload.uid': 1 }, unique: true })
     )
   })
 })

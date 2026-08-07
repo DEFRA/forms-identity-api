@@ -104,7 +104,11 @@ export async function createIndexes(database) {
   }
   // oidc-provider payloads are stored under a `payload` field, so lookups by
   // uid/grantId target the nested keys
-  await database.collection('session').createIndex({ 'payload.uid': 1 }, {})
+  // a session uid is generated per sign-in, so a collision is a fault worth
+  // failing on rather than quietly storing twice
+  await database
+    .collection('session')
+    .createIndex({ 'payload.uid': 1 }, { unique: true })
   for (const name of GRANTABLE_COLLECTION_NAMES) {
     await database.collection(name).createIndex({ 'payload.grantId': 1 }, {})
   }
