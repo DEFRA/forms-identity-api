@@ -28,7 +28,10 @@ describe('notify client', () => {
     expect(options.payload).toEqual({
       template_id: 'template-1',
       email_address: 'citizen@example.com',
-      personalisation: { code: '123456', expiry_minutes: 15 }
+      personalisation: { code: '123456', expiry_minutes: 15 },
+      // a configured reply-to makes the mail more likely to reach an inbox
+      // rather than a spam folder
+      email_reply_to_id: process.env.NOTIFY_REPLY_TO_ID
     })
     const auth = options.headers.Authorization
     expect(auth).toMatch(/^Bearer /)

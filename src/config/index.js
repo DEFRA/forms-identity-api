@@ -146,6 +146,13 @@ export const config = convict({
         format: String,
         default: '',
         env: 'NOTIFY_OTP_TEMPLATE_ID'
+      },
+      /** @type {SchemaObj<string | null>} */
+      replyToId: {
+        doc: 'GOV.UK Notify reply-to address id. Sending from a real reply-to address makes the code email likelier to reach an inbox rather than a spam folder, so it is required in every environment and has no default.',
+        format: String,
+        default: /** @type {string | null} */ (null),
+        env: 'NOTIFY_REPLY_TO_ID'
       }
     }
   },

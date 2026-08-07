@@ -19,5 +19,6 @@ process.env.HTTP_PROXY = ''
 process.env.NOTIFY_API_KEY =
   'test_key-zzzzzzzz-zzzz-zzzz-zzzz-servicezzzzz-zzzzzzzz-zzzz-zzzz-zzzz-apikeyzzzzzz'
 process.env.NOTIFY_OTP_TEMPLATE_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
+process.env.NOTIFY_REPLY_TO_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-replytozzzzz'
 
 process.env.TRACING_HEADER = 'x-cdp-request-id'

@@ -13,6 +13,7 @@ const SERVICE_ID_SUBSTRING_REDUCTION = 73
 const SERVICE_ID_SUBSTRING_REDUCTION_2 = 37
 
 const apiKey = config.get('otp.notify.apiKey')
+const replyToId = config.get('otp.notify.replyToId')
 
 if (!apiKey) {
   // Fail loud at load (i.e. boot) rather than silently never deliver — the
@@ -47,7 +48,8 @@ export async function sendEmail(templateId, emailAddress, personalisation) {
     payload: {
       template_id: templateId,
       email_address: emailAddress,
-      personalisation
+      personalisation,
+      email_reply_to_id: replyToId
     },
     headers: {
       Authorization: 'Bearer ' + createToken(serviceId, apiKeyId)
