@@ -98,7 +98,13 @@ export async function verifyOtp(uid, code) {
   // related, we need to be sure.
   const isExpired = doc ? doc.expireAt.getTime() < Date.now() : false
 
-  if (!doc || isExpired) {
+  // Likewise the attempt budget. Reaching it marks the record used below, but
+  // that write can fail or be cut short by a crash, and a lockout that only
+  // holds when the last write succeeded is no lockout at all. The count is
+  // the authority; marking it used is the tidy-up.
+  const isSpent = doc ? doc.attempts >= OTP_MAX_ATTEMPTS : false
+
+  if (!doc || isExpired || isSpent) {
     return fail
   }
 

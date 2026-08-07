@@ -150,6 +150,27 @@ describe('signin service', () => {
   })
 
   describe('verifyOtp', () => {
+    it('stops accepting guesses once the budget is spent, even if the record was never marked used', async () => {
+      // the write that marks the record used is a tidy-up, not the guard: a
+      // blip or a crash between the two operations must not hand out a sixth
+      // guess
+      build()
+      const code = await request('uid-budget')
+      const wrong = code === '000000' ? '111111' : '000000'
+
+      // the only write this path makes is the one marking the record used,
+      // so failing every update simulates that write never landing
+      jest.mocked(otpsRepository.update).mockResolvedValue(false)
+
+      for (let i = 0; i < 5; i++) {
+        await verifyOtp('uid-budget', wrong)
+      }
+
+      await expect(verifyOtp('uid-budget', code)).resolves.toEqual({
+        status: 'invalid'
+      })
+    })
+
     it('signs in immediately when an account exists', async () => {
       const docs = build()
       jest
