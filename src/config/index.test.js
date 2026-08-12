@@ -30,4 +30,16 @@ describe('config', () => {
   it('should configure request tracing', () => {
     expect(config.get('tracing.header')).toBe('x-cdp-request-id')
   })
+
+  it('should configure one-time codes', () => {
+    expect(config.get('otp.ttlSeconds')).toBe(900)
+    expect(config.get('otp.maxAttempts')).toBe(5)
+  })
+
+  it('should read Notify credentials from the environment', () => {
+    expect(config.get('otp.notify.apiKey')).toBe(process.env.NOTIFY_API_KEY)
+    expect(config.get('otp.notify.templateId')).toBe(
+      process.env.NOTIFY_OTP_TEMPLATE_ID
+    )
+  })
 })

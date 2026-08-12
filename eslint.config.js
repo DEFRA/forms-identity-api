@@ -217,7 +217,8 @@ export default [
     files: [
       '**/*.test.{cjs,js,mjs}',
       '**/__stubs__/*.{cjs,js,mjs}',
-      '**/__mocks__/*.{cjs,js,mjs}'
+      '**/__mocks__/*.{cjs,js,mjs}',
+      'test/**/*.{cjs,js,mjs}'
     ],
     plugins: jest.configs['flat/recommended'].plugins,
     languageOptions: {
