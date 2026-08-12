@@ -30,7 +30,7 @@ describe('citizen sign-in journeys', () => {
 
   it('refuses the same code typed without its leading zeros', async () => {
     // we never pad on a citizen's behalf: "1" is not "000001", it is a code
-    // of the wrong shape and is turned away before the service sees it
+    // of the wrong shape, answered as invalid without spending a guess
     const randomInt = jest
       .spyOn(crypto, 'randomInt')
       .mockReturnValue(/** @type {never} */ (1))
@@ -45,7 +45,8 @@ describe('citizen sign-in journeys', () => {
       payload: { uid: 'uid-shortform', code: '1' }
     })
 
-    expect(res.statusCode).toBe(400)
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({ status: 'invalid' })
 
     // and the real code still works afterwards — the attempt was not spent
     expect(await verify('uid-shortform', code)).toEqual({

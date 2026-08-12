@@ -7,17 +7,9 @@ import { config } from '~/src/config/index.js'
 import { PURPOSE, STATUS } from '~/src/constants.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
+import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
-
-/**
- * One-time codes are always six digits, zero-padded, so the value 1 is issued,
- * hashed, emailed and typed as "000001". The padding is part of the code
- * rather than a display choice, which keeps the whole million-value range in
- * use and means the code the citizen reads is the code we stored.
- */
-const CODE_LENGTH = 6
-const CODE_MAX_EXCLUSIVE = 10 ** CODE_LENGTH
 
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
 const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
@@ -36,10 +28,7 @@ const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
  */
 export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
-  const code = String(crypto.randomInt(0, CODE_MAX_EXCLUSIVE)).padStart(
-    CODE_LENGTH,
-    '0'
-  )
+  const code = generateCode()
   const codeHash = await argon2.hash(code)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
 
@@ -85,6 +74,13 @@ function sendOtpEmail(email, code) {
 export async function verifyOtp(uid, code) {
   /** @type {VerifyResult} */
   const fail = { status: STATUS.INVALID }
+
+  // A code that fails the shape schema cannot be a real code: turn it away as
+  // invalid before any lookup, and without spending a guess.
+  if (codeSchema.validate(code).error) {
+    return fail
+  }
+
   const filter = {
     uid,
     purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
