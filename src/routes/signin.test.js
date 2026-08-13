@@ -85,18 +85,19 @@ describe('signin routes', () => {
     })
   })
 
-  it('POST /otp/verify rejects malformed codes with 400 before the service', async () => {
+  it('POST /otp/verify passes any code string through to the service, which owns the shape rule', async () => {
+    jest.mocked(verifyOtp).mockResolvedValue({ status: 'invalid' })
     const server = await buildServer()
 
-    for (const code of ['definitely wrong', '12345', '1234567', '']) {
+    for (const code of ['12345', 'definitely wrong', '']) {
       const res = await server.inject({
         method: 'POST',
         url: '/otp/verify',
         payload: { uid: 'uid-1', code }
       })
-      expect(res.statusCode).toBe(400)
+      expect(res.statusCode).toBe(200)
+      expect(verifyOtp).toHaveBeenLastCalledWith('uid-1', code)
     }
-    expect(verifyOtp).not.toHaveBeenCalled()
   })
 
   it('POST /accounts rejects text that is not a telephone number with 400', async () => {

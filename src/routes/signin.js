@@ -43,9 +43,7 @@ export default /** @type {ServerRoute[]} */ ([
       validate: {
         payload: Joi.object({
           uid: Joi.string().required(),
-          code: Joi.string()
-            .pattern(/^\d{6}$/)
-            .required()
+          code: Joi.string().allow('').required()
         })
       }
     },
