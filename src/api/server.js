@@ -2,6 +2,7 @@ import hapi from '@hapi/hapi'
 import Wreck from '@hapi/wreck'
 import { ProxyAgent } from 'proxy-agent'
 
+import { serviceJwt } from '~/src/auth/service-jwt.js'
 import { config } from '~/src/config/index.js'
 import { failAction } from '~/src/helpers/fail-action.js'
 import { requestLogger } from '~/src/helpers/logging/request-logger.js'
@@ -62,6 +63,7 @@ export async function createServer() {
   }
 
   await prepareDb(server.logger)
+  await server.register(serviceJwt)
   await server.register(router)
 
   return server

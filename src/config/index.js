@@ -156,6 +156,45 @@ export const config = convict({
       }
     }
   },
+  auth: {
+    jwt: {
+      /** @type {SchemaObj<string>} */
+      issuer: {
+        doc: 'Issuer that must have signed the caller token. Set by the platform in deployed environments; the local default is the aws-sts-stub constant.',
+        format: String,
+        default: 'https://local.tokens.sts.global.api.aws',
+        env: 'CDP_JWT_ISSUER'
+      },
+      /** @type {SchemaObj<string>} */
+      jwksUri: {
+        doc: 'Public keys that verify the caller token',
+        format: String,
+        default: 'http://localhost:4571/.well-known/jwks.json',
+        env: 'CDP_JWT_JWKS_URI'
+      },
+      /** @type {SchemaObj<string>} */
+      audience: {
+        doc: 'Audience the caller must address the token to',
+        format: String,
+        default: 'forms-identity-api',
+        env: 'SERVICE_AUTH_AUDIENCE'
+      }
+    },
+    /** @type {SchemaObj<string>} */
+    awsAccount: {
+      doc: 'AWS account the calling service runs in, part of its role ARN',
+      format: String,
+      default: '000000000000',
+      env: 'AWS_ACCOUNT'
+    },
+    /** @type {SchemaObj<string>} */
+    allowedCaller: {
+      doc: 'Service permitted to call this API',
+      format: String,
+      default: 'forms-identity-ui',
+      env: 'SERVICE_AUTH_ALLOWED_CALLER'
+    }
+  },
   /** @type {SchemaObj<string>} */
   httpProxy: {
     doc: 'HTTP Proxy',
