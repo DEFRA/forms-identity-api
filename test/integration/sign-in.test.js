@@ -10,7 +10,7 @@ import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 
-const { inject, requestCode, verify } = setupSigninFlow()
+const { inject, injectWithoutToken, requestCode, verify } = setupSigninFlow()
 
 describe('citizen sign-in journeys', () => {
   it('accepts a code whose leading zeros are part of it', async () => {
@@ -158,5 +158,15 @@ describe('citizen sign-in journeys', () => {
 
     const account = await inject({ method: 'GET', url: '/accounts/acc-none' })
     expect(account.statusCode).toBe(404)
+  })
+
+  it('refuses a caller with no token, end to end through the real server', async () => {
+    const res = await injectWithoutToken({
+      method: 'POST',
+      url: '/otp/request',
+      payload: { uid: 'uid-no-token', email: 'citizen@example.com' }
+    })
+
+    expect(res.statusCode).toBe(401)
   })
 })

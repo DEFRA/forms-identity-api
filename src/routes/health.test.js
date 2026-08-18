@@ -1,4 +1,8 @@
 import { createServer } from '~/src/api/server.js'
+import {
+  startServiceAuthStub,
+  stopServiceAuthStub
+} from '~/test/helpers/service-auth.js'
 
 jest.mock('~/src/mongo.js', () => ({
   prepareDb: jest.fn(),
@@ -16,12 +20,16 @@ describe('Health route', () => {
   let server
 
   beforeAll(async () => {
+    // The server-wide auth default warms its JWKS cache on initialize, so
+    // this needs a reachable key set even though /health itself opts out.
+    await startServiceAuthStub()
     server = await createServer()
     await server.initialize()
   })
 
-  afterAll(() => {
-    return server.stop()
+  afterAll(async () => {
+    await server.stop()
+    await stopServiceAuthStub()
   })
 
   const okStatusCode = 200
@@ -29,6 +37,9 @@ describe('Health route', () => {
 
   describe('Success responses', () => {
     test('Testing GET /health route returns 200', async () => {
+      // No Authorization header: /health is the one endpoint the
+      // deny-by-default policy opts out, and that is an acceptance
+      // criterion worth asserting explicitly, not just by omission.
       const response = await server.inject({
         method: 'GET',
         url: '/health'

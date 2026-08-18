@@ -12,6 +12,11 @@ import {
   MONGO_BOOT_TIMEOUT_MS,
   startMongoMemoryServer
 } from '~/test/helpers/mongo-memory.js'
+import {
+  mintToken,
+  startServiceAuthStub,
+  stopServiceAuthStub
+} from '~/test/helpers/service-auth.js'
 
 /** The code from the most recent Notify email */
 function lastSentCode() {
@@ -36,6 +41,7 @@ export function setupSigninFlow() {
   let server
 
   beforeAll(async () => {
+    await startServiceAuthStub()
     mongod = await startMongoMemoryServer()
     server = await createServer()
     await server.initialize()
@@ -53,13 +59,31 @@ export function setupSigninFlow() {
     await server.stop()
     await client.close()
     await mongod.stop()
+    await stopServiceAuthStub()
   })
 
   /**
-   * Injects a request into the running server
+   * Injects a request into the running server as the allowed caller, so flow
+   * tests exercise the routes behind the same token check production
+   * enforces rather than bypassing it.
    * @param {import('@hapi/hapi').ServerInjectOptions} options
    */
-  const inject = (options) => server.inject(options)
+  const inject = (options) =>
+    server.inject({
+      ...options,
+      headers: {
+        ...options.headers,
+        authorization: `Bearer ${mintToken()}`
+      }
+    })
+
+  /**
+   * Injects a request with no bearer token, so a test can prove the
+   * deny-by-default policy actually refuses an unauthenticated caller end
+   * to end, on the same server every other test in the suite talks to.
+   * @param {import('@hapi/hapi').ServerInjectOptions} options
+   */
+  const injectWithoutToken = (options) => server.inject(options)
 
   /**
    * Requests a sign-in code over HTTP and returns the code that "was emailed"
@@ -91,5 +115,5 @@ export function setupSigninFlow() {
     return JSON.parse(res.payload)
   }
 
-  return { inject, requestCode, verify, lastSentCode }
+  return { inject, injectWithoutToken, requestCode, verify, lastSentCode }
 }
