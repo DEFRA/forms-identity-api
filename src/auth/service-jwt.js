@@ -6,13 +6,15 @@ import { config } from '~/src/config/index.js'
  * The role ARN the calling service presents as its subject. STS derives this
  * from the credentials that signed the token request, so a caller cannot ask
  * to be someone else.
+ *
+ * The value is one configured string rather than assembled from an account
+ * and a service name, because CDP names task roles per environment
+ * (`<environment>-ecs-<service>-role`) and there is no formula that derives
+ * the right one everywhere.
  * @returns {string}
  */
 export function expectedSubject() {
-  const account = config.get('auth.awsAccount')
-  const caller = config.get('auth.allowedCaller')
-
-  return `arn:aws:iam::${account}:role/${caller}`
+  return /** @type {string} */ (config.get('auth.allowedSubject'))
 }
 
 /**
@@ -31,20 +33,27 @@ export const serviceJwt = {
     async register(server) {
       await server.register(Jwt)
 
+      const audience = config.get('auth.jwt.audience')
+      const issuer = config.get('auth.jwt.issuer')
+      const sub = expectedSubject()
+
       server.auth.strategy('service-jwt', 'jwt', {
         keys: {
           uri: config.get('auth.jwt.jwksUri'),
           algorithms: ['RS256']
         },
-        verify: {
-          aud: config.get('auth.jwt.audience'),
-          iss: config.get('auth.jwt.issuer'),
-          sub: expectedSubject()
-        },
+        verify: { aud: audience, iss: issuer, sub },
         validate: false
       })
 
       server.auth.default('service-jwt')
+
+      // None of these three is secret, and recording them turns a first-deploy
+      // mismatch into a one-line diagnosis rather than a generic 401 with no
+      // trace of what the API expected.
+      server.logger.info(
+        `service-jwt expects sub=${sub} iss=${issuer} aud=${audience}`
+      )
     }
   }
 }

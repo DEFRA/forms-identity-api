@@ -2,6 +2,7 @@ import Hapi from '@hapi/hapi'
 
 import { expectedSubject, serviceJwt } from '~/src/auth/service-jwt.js'
 import { config } from '~/src/config/index.js'
+import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import {
   mintToken,
   startServiceAuthStub,
@@ -14,10 +15,13 @@ const servers = []
 /**
  * Builds a bare server with the strategy registered directly, so each test
  * controls its own routes and auth options rather than the full app wiring.
+ * requestLogger is registered first, matching the real server, because the
+ * strategy logs through `server.logger` at registration.
  * @returns {Promise<HapiServer>}
  */
 async function buildServer() {
   const server = Hapi.server()
+  await server.register(requestLogger)
   await server.register(serviceJwt)
   server.route({
     method: 'GET',
@@ -56,10 +60,8 @@ afterAll(async () => {
 })
 
 describe('service-jwt', () => {
-  it('builds the caller subject from the account and the allowed caller', () => {
-    expect(expectedSubject()).toBe(
-      `arn:aws:iam::${config.get('auth.awsAccount')}:role/${config.get('auth.allowedCaller')}`
-    )
+  it('reads the caller subject straight from config', () => {
+    expect(expectedSubject()).toBe(config.get('auth.allowedSubject'))
   })
 
   it('admits a token from the expected caller', async () => {

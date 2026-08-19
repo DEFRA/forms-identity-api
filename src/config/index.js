@@ -180,19 +180,14 @@ export const config = convict({
         env: 'SERVICE_AUTH_AUDIENCE'
       }
     },
-    /** @type {SchemaObj<string>} */
-    awsAccount: {
-      doc: 'AWS account the calling service runs in, part of its role ARN',
+    /** @type {SchemaObj<string | null>} */
+    allowedSubject: {
+      doc: 'Complete expected `sub` of the caller token — the calling role ARN STS stamps onto it. CDP names task roles per environment, so this has no universal default and is required in production; the local default matches what aws-sts-stub mints.',
       format: String,
-      default: '000000000000',
-      env: 'AWS_ACCOUNT'
-    },
-    /** @type {SchemaObj<string>} */
-    allowedCaller: {
-      doc: 'Service permitted to call this API',
-      format: String,
-      default: 'forms-identity-ui',
-      env: 'SERVICE_AUTH_ALLOWED_CALLER'
+      default: isProduction
+        ? /** @type {string | null} */ (null)
+        : 'arn:aws:iam::000000000000:role/forms-identity-ui',
+      env: 'SERVICE_AUTH_ALLOWED_SUBJECT'
     }
   },
   /** @type {SchemaObj<string>} */
