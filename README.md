@@ -8,7 +8,7 @@ This service issues and manages identities for form submitters. It is a backend 
 
 ### Node.js
 
-Please install [Node.js](https://nodejs.org/) `>= v22` and [npm](https://nodejs.org/) `>= v10`. You will find it easier to use the Node Version Manager [nvm](https://github.com/creationix/nvm):
+Please install [Node.js](https://nodejs.org/) `>= v24` and [npm](https://nodejs.org/) `>= v12`. You will find it easier to use the Node Version Manager [nvm](https://github.com/creationix/nvm):
 
 ```sh
 cd forms-identity-api
