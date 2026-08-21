@@ -46,7 +46,7 @@ describe('citizen sign-in journeys', () => {
     })
 
     expect(res.statusCode).toBe(200)
-    expect(JSON.parse(res.payload)).toEqual({ status: 'invalid' })
+    expect(JSON.parse(res.payload)).toEqual({ status: 'invalid-code-format' })
 
     // and the real code still works afterwards — the attempt was not spent
     expect(await verify('uid-shortform', code)).toEqual({
