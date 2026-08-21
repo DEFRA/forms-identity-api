@@ -72,14 +72,14 @@ function sendOtpEmail(email, code) {
  * @returns {Promise<VerifyResult>}
  */
 export async function verifyOtp(uid, code) {
-  /** @type {VerifyResult} */
-  const fail = { status: STATUS.INVALID }
-
   // A code that fails the shape schema cannot be a real code: turn it away as
   // invalid before any lookup, and without spending a guess.
   if (codeSchema.validate(code).error) {
-    return fail
+    return { status: STATUS.INVALID_CODE_FORMAT }
   }
+
+  /** @type {VerifyResult} */
+  const fail = { status: STATUS.INVALID }
 
   const filter = {
     uid,
@@ -276,6 +276,6 @@ export async function findAccountById(id) {
  * @import { Filter } from 'mongodb'
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
- * @typedef {{ status: 'invalid' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
+ * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */
