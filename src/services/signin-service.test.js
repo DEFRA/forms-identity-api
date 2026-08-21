@@ -276,6 +276,22 @@ describe('signin service', () => {
 
       expect(result).toEqual({ status: 'invalid' })
     })
+
+    it.each([
+      '1',
+      '12',
+      '123',
+      '1234',
+      '12345',
+      '1234567',
+      '12345678',
+      'abc123',
+      '*&^%$£'
+    ])('returns invalid-code-format (%s)', async (code) => {
+      const result = await verifyOtp('uid-1', code)
+
+      expect(result).toEqual({ status: 'invalid-code-format' })
+    })
   })
 
   describe('completeSignup', () => {
