@@ -39,6 +39,7 @@ module.exports = {
   // See: https://jestjs.io/docs/ecmascript-modules
   transformIgnorePatterns: [
     `node_modules/(?!${[
+      '@defra/cdp-auditing', // Supports ESM only
       '@defra/hapi-tracing' // Supports ESM only
     ].join('|')}/)`
   ]

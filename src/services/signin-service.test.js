@@ -2,6 +2,7 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { PURPOSE } from '~/src/constants.js'
+import { auditRegistration, auditSignIn } from '~/src/lib/audit.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
@@ -28,6 +29,10 @@ jest.mock('~/src/repositories/accounts-repository.js', () => ({
 }))
 jest.mock('~/src/lib/notify.js', () => ({
   sendEmail: jest.fn()
+}))
+jest.mock('~/src/lib/audit.js', () => ({
+  auditSignIn: jest.fn(),
+  auditRegistration: jest.fn()
 }))
 
 /**
@@ -175,13 +180,32 @@ describe('signin service', () => {
       const docs = build()
       jest
         .mocked(accountsRepository.findByEmail)
-        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-1' }))
+        .mockResolvedValue(
+          /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
+        )
       const code = await request('uid-1')
 
       const result = await verifyOtp('uid-1', code)
 
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-1' })
       expect(docs[0].consumed).toBe(true)
+      expect(auditSignIn).toHaveBeenCalledTimes(1)
+      expect(auditSignIn).toHaveBeenCalledWith('acc-1', 'a@b.com')
+      expect(auditRegistration).not.toHaveBeenCalled()
+    })
+
+    it('does not audit a sign in when the record is consumed by a concurrent request', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'acc-1' }))
+      const code = await request('uid-1')
+      jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
+
+      const result = await verifyOtp('uid-1', code)
+
+      expect(result).toEqual({ status: 'invalid' })
+      expect(auditSignIn).not.toHaveBeenCalled()
     })
 
     it('requires the phone step when no account exists', async () => {
@@ -193,6 +217,8 @@ describe('signin service', () => {
       expect(result).toEqual({ status: 'phone-required' })
       expect(docs[0].verified).toBe(true)
       expect(docs[0].consumed).toBe(false)
+      expect(auditSignIn).not.toHaveBeenCalled()
+      expect(auditRegistration).not.toHaveBeenCalled()
     })
 
     it('rejects a code minted for another interaction and burns the local attempt', async () => {
@@ -307,6 +333,37 @@ describe('signin service', () => {
         accountId: expect.stringMatching(/^[0-9a-f-]{36}$/)
       })
       expect(docs[0].consumed).toBe(true)
+      const { accountId } = /** @type {{ accountId: string }} */ (result)
+      expect(auditRegistration).toHaveBeenCalledTimes(1)
+      expect(auditRegistration).toHaveBeenCalledWith(
+        accountId,
+        'a@b.com',
+        '+447911123456'
+      )
+      expect(auditSignIn).toHaveBeenCalledTimes(1)
+      expect(auditSignIn).toHaveBeenCalledWith(accountId, 'a@b.com')
+    })
+
+    it('audits the existing account when the email already has one (duplicate race)', async () => {
+      await verified()
+      const existing = { _id: 'acc-existing', email: 'a@b.com' }
+      jest
+        .mocked(accountsRepository.insert)
+        .mockRejectedValue(new Error('E11000'))
+      jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(true)
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ (existing))
+
+      const result = await completeSignup('uid-1', '07911 123456')
+
+      expect(result).toEqual({ status: 'signed-in', accountId: 'acc-existing' })
+      expect(auditRegistration).toHaveBeenCalledWith(
+        'acc-existing',
+        'a@b.com',
+        undefined
+      )
+      expect(auditSignIn).toHaveBeenCalledWith('acc-existing', 'a@b.com')
     })
 
     it('rejects an invalid phone without consuming the record', async () => {
@@ -316,6 +373,8 @@ describe('signin service', () => {
 
       expect(result).toEqual({ status: 'invalid-phone' })
       expect(docs[0].consumed).toBe(false)
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).not.toHaveBeenCalled()
     })
 
     it('rejects completion without a verified record (out-of-order call)', async () => {
@@ -444,6 +503,8 @@ describe('signin service', () => {
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs[0].verified).toBe(true)
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).not.toHaveBeenCalled()
     })
   })
 
