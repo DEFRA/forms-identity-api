@@ -204,8 +204,6 @@ export async function completeSignup(uid, phone) {
     return { status: STATUS.INVALID } // a concurrent submit already completed
   }
 
-  // audited after the claim lands, so a submit that a concurrent one beat
-  // leaves no record
   auditRegistration(account._id, account.email, account.phone)
   auditSignIn(account._id, account.email)
 

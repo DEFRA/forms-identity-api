@@ -14,7 +14,8 @@ export const AUDIT_EVENT = {
  * Writes one audit record. Every event goes through here rather than the
  * CDP audit logger directly, so the account id and email are always present
  * and every record has the same shape. The library stamps the time and the
- * platform adds the service name and version.
+ * platform adds the service name and version, so we don't have to log those
+ * explicitly.
  * @param {string} event
  * @param {string} accountId
  * @param {string} email
