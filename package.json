@@ -47,7 +47,7 @@
     "google-libphonenumber": "^3.2.46",
     "hapi-pino": "^13.0.0",
     "http-status-codes": "^2.3.0",
-    "joi": "^17.13.3",
+    "joi": "^18.2.5",
     "mongodb": "^7.2.0",
     "pino": "^10.3.1",
     "pino-pretty": "^13.1.3",
