@@ -78,9 +78,6 @@ export async function verifyOtp(uid, code) {
     return { status: STATUS.INVALID_CODE_FORMAT }
   }
 
-  /** @type {VerifyResult} */
-  const fail = { status: STATUS.INVALID }
-
   const filter = {
     uid,
     purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
@@ -89,8 +86,13 @@ export async function verifyOtp(uid, code) {
   }
   const doc = await otpsRepository.findOne(filter)
 
+  /** @type {VerifyResult} */
+  const consumedOrExpiredResult = {
+    status: STATUS.INVALID_CODE_CONSUMED_OR_EXPIRED
+  }
+
   if (!doc || !isGuessable(doc)) {
-    return fail
+    return consumedOrExpiredResult
   }
 
   // Every write below pins codeHash so it only lands on the exact record
@@ -100,10 +102,13 @@ export async function verifyOtp(uid, code) {
 
   const ok = await argon2.verify(doc.codeHash, code)
 
-  if (!ok) {
-    await spendAttempt(claim)
+  /** @type {VerifyResult} */
+  const failResult = { status: STATUS.INVALID }
 
-    return fail
+  if (!ok) {
+    const consumed = await spendAttempt(claim)
+
+    return consumed ? consumedOrExpiredResult : failResult
   }
 
   const account = await accountsRepository.findByEmail(doc.target)
@@ -112,7 +117,7 @@ export async function verifyOtp(uid, code) {
     const consumed = await otpsRepository.update(claim, { consumed: true })
 
     if (!consumed) {
-      return fail // concurrently spent or superseded by a resend
+      return failResult // concurrently spent or superseded by a resend
     }
 
     return { status: STATUS.SIGNED_IN, accountId: account._id }
@@ -121,7 +126,7 @@ export async function verifyOtp(uid, code) {
   const verified = await otpsRepository.update(claim, { verified: true })
 
   if (!verified) {
-    return fail
+    return failResult
   }
 
   return { status: STATUS.PHONE_REQUIRED }
@@ -157,10 +162,13 @@ function isGuessable(doc) {
 async function spendAttempt(claim) {
   const updated = await otpsRepository.incrementAttempts(claim)
   const attempts = updated?.attempts ?? 0
+  let consumed = false
 
   if (attempts >= OTP_MAX_ATTEMPTS) {
-    await otpsRepository.update(claim, { consumed: true })
+    consumed = await otpsRepository.update(claim, { consumed: true })
   }
+
+  return consumed
 }
 
 /**
@@ -276,6 +284,6 @@ export async function findAccountById(id) {
  * @import { Filter } from 'mongodb'
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
- * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
+ * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */

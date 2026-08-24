@@ -167,7 +167,7 @@ describe('signin service', () => {
       }
 
       await expect(verifyOtp('uid-budget', code)).resolves.toEqual({
-        status: 'invalid'
+        status: 'invalid-code-consumed-or-expired'
       })
     })
 
@@ -238,7 +238,7 @@ describe('signin service', () => {
 
       const result = await verifyOtp('uid-1', code)
 
-      expect(result).toEqual({ status: 'invalid' })
+      expect(result).toEqual({ status: 'invalid-code-consumed-or-expired' })
     })
 
     it('still accepts the right code after 4 wrong attempts (the budget is 5)', async () => {
@@ -263,7 +263,7 @@ describe('signin service', () => {
       }
       const result = await verifyOtp('uid-1', code)
 
-      expect(result).toEqual({ status: 'invalid' })
+      expect(result).toEqual({ status: 'invalid-code-consumed-or-expired' })
       expect(docs[0].consumed).toBe(true)
     })
 
@@ -274,7 +274,7 @@ describe('signin service', () => {
 
       const result = await verifyOtp('uid-1', code)
 
-      expect(result).toEqual({ status: 'invalid' })
+      expect(result).toEqual({ status: 'invalid-code-consumed-or-expired' })
     })
 
     it.each([
