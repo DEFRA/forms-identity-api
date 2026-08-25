@@ -33,7 +33,7 @@ export const serviceJwt = {
     async register(server) {
       await server.register(Jwt)
 
-      const audience = config.get('auth.jwt.audience')
+      const audience = /** @type {string} */ (config.get('auth.jwt.audience'))
       const issuer = config.get('auth.jwt.issuer')
       const sub = expectedSubject()
 

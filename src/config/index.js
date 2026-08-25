@@ -172,12 +172,12 @@ export const config = convict({
         default: 'http://localhost:4571/.well-known/jwks.json',
         env: 'CDP_JWT_JWKS_URI'
       },
-      /** @type {SchemaObj<string>} */
+      /** @type {SchemaObj<string | null>} */
       audience: {
-        doc: 'Audience the caller must address the token to',
+        doc: 'Audience the caller must address the token to — this service. Read from SERVICE, which the platform sets to the repo name in every deployed environment, so the accepted audience cannot drift from the service itself. No default: a missing value fails the boot rather than starting a server that verifies against nothing.',
         format: String,
-        default: 'forms-identity-api',
-        env: 'SERVICE_AUTH_AUDIENCE'
+        default: null,
+        env: 'SERVICE'
       }
     },
     /** @type {SchemaObj<string | null>} */
