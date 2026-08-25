@@ -48,9 +48,9 @@ export const serviceJwt = {
 
       server.auth.default('service-jwt')
 
-      // None of these three is secret, and recording them turns a first-deploy
-      // mismatch into a one-line diagnosis rather than a generic 401 with no
-      // trace of what the API expected.
+      // None of these three is secret, and logging them means a mismatch on
+      // first deploy shows up as one clear log line rather than a generic
+      // 401 that does not say what the API expected.
       server.logger.info(
         `service-jwt expects sub=${sub} iss=${issuer} aud=${audience}`
       )

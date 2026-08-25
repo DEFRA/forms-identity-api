@@ -174,7 +174,7 @@ export const config = convict({
       },
       /** @type {SchemaObj<string | null>} */
       audience: {
-        doc: 'Audience the caller must address the token to — this service. Read from SERVICE, which the platform sets to the repo name in every deployed environment, so the accepted audience cannot drift from the service itself. No default: a missing value fails the boot rather than starting a server that verifies against nothing.',
+        doc: 'Audience the caller must address the token to — this service. Read from SERVICE, which the platform sets to the repo name in every deployed environment, so the accepted audience cannot drift from the service itself. No default: a missing value stops the boot rather than starting a server with no expected audience.',
         format: String,
         default: null,
         env: 'SERVICE'
