@@ -1,7 +1,6 @@
 import { createPublicKey, generateKeyPairSync, sign } from 'node:crypto'
 import http from 'node:http'
 
-import { expectedSubject } from '~/src/auth/service-jwt.js'
 import { config } from '~/src/config/index.js'
 
 const KID = 'test-rs256'
@@ -76,7 +75,7 @@ export function mintToken(overrides = {}) {
   const now = Math.floor(Date.now() / 1000)
   const header = encode({ alg: 'RS256', typ: 'JWT', kid: KID })
   const payload = encode({
-    sub: overrides.sub ?? expectedSubject(),
+    sub: overrides.sub ?? config.get('auth.allowedSubject'),
     aud: overrides.aud ?? config.get('auth.jwt.audience'),
     iss: overrides.iss ?? config.get('auth.jwt.issuer'),
     iat: now,

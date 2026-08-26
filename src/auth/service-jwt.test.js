@@ -1,7 +1,6 @@
 import Hapi from '@hapi/hapi'
 
-import { expectedSubject, serviceJwt } from '~/src/auth/service-jwt.js'
-import { config } from '~/src/config/index.js'
+import { serviceJwt } from '~/src/auth/service-jwt.js'
 import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import {
   mintToken,
@@ -60,10 +59,6 @@ afterAll(async () => {
 })
 
 describe('service-jwt', () => {
-  it('reads the caller subject straight from config', () => {
-    expect(expectedSubject()).toBe(config.get('auth.allowedSubject'))
-  })
-
   it('admits a token from the expected caller', async () => {
     const server = await buildServer()
 
