@@ -31,3 +31,20 @@ services:
     environment:
       ME_CONFIG_MONGODB_URL: mongodb://mongo:27017/?replicaSet=rs0&directConnection=true
       ME_CONFIG_BASICAUTH: false
+
+  aws-sts-stub:
+    # Stub of the AWS STS GetWebIdentityToken API. Every request to this API
+    # needs a caller token verified against the stub's JWKS endpoint, and
+    # `@hapi/jwt` fetches that key set as the server initialises, so the stub
+    # must be up before `npm run dev`.
+    image: defradigital/aws-sts-stub:latest
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:4571:4571
+    environment:
+      AWS_ACCOUNT_ID: '000000000000'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:4571/health']
+      interval: 5s
+      start_period: 2s
+      retries: 5

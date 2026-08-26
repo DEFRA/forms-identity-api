@@ -4,13 +4,6 @@ Defra Forms identity API — a private OIDC identity provider for citizen sign-i
 
 This service issues and manages identities for form submitters. It is a backend API (Hapi + MongoDB) that sits on a private network; browsers never reach it directly — only other Defra Forms services do.
 
-## Deployment order
-
-forms-identity-ui must deploy before this service. Every request here needs
-a caller token, and forms-identity-ui is the only service that mints one —
-deploying this API first means it starts rejecting every call before
-anything sends a token, breaking sign-in until forms-identity-ui catches up.
-
 ## Requirements
 
 ### Node.js
@@ -38,19 +31,6 @@ The API requires a MongoDB replica set. Start one locally (plus mongo-express on
 
 ```sh
 docker compose up -d mongo
-```
-
-### aws-sts-stub
-
-Every request needs a signed caller token, verified against a JWKS endpoint.
-`@hapi/jwt` fetches that key set as soon as the server initialises, so it
-needs a running stub before `npm run dev` — otherwise the process fails to
-start with `ECONNREFUSED`. Start it from
-[`forms-development-tools`](https://github.com/DEFRA/forms-development-tools):
-
-```sh
-cd ../forms-development-tools/local-development-dependencies
-docker compose up -d aws-sts-stub
 ```
 
 ### Development
