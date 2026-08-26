@@ -55,7 +55,7 @@ afterAll(async () => {
   // Stopping each server clears its JWKS cache timer, so the process can
   // exit rather than waiting on cached-key expiry.
   await Promise.all(servers.map((server) => server.stop()))
-  await stopServiceAuthStub()
+  stopServiceAuthStub()
 })
 
 describe('service-jwt', () => {

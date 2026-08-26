@@ -78,6 +78,7 @@
     "lint-staged": "^17.0.7",
     "mongodb-memory-server": "^11.2.0",
     "neostandard": "^0.13.0",
+    "nock": "^14.0.17",
     "prettier": "^3.9.0",
     "tsx": "^4.22.4",
     "typescript": "^5.9.3",

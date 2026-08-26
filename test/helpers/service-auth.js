@@ -1,16 +1,20 @@
 import { createPublicKey, generateKeyPairSync, sign } from 'node:crypto'
-import http from 'node:http'
+
+import nock from 'nock'
 
 import { config } from '~/src/config/index.js'
 
 const KID = 'test-rs256'
 
+// A fixed fake origin rather than an ephemeral port: nock intercepts the
+// request inside the process, so no socket ever opens and the URI can be a
+// constant.
+const JWKS_ORIGIN = 'http://sts.test'
+const JWKS_PATH = '/.well-known/jwks.json'
+
 const { privateKey } = generateKeyPairSync('rsa', {
   modulusLength: 2048
 })
-
-/** @type {Server} */
-let jwksServer
 
 /**
  * @param {unknown} value
@@ -19,55 +23,38 @@ const encode = (value) =>
   Buffer.from(JSON.stringify(value)).toString('base64url')
 
 /**
- * Starts an in-process JWKS server and points config at it, so a suite's
- * server.initialize() finds a real key set to warm its cache from — the same
- * verification path production runs, rather than a test-only bypass.
- * @returns {Promise<void>}
+ * Intercepts the JWKS fetch with nock and points config at the fake origin,
+ * so a suite's server.initialize() finds a key set to warm its cache from.
+ * The Wreck client path still runs; only the transport is intercepted.
  */
-export async function startServiceAuthStub() {
+export function startServiceAuthStub() {
   const jwk = createPublicKey(privateKey).export({ format: 'jwk' })
 
-  jwksServer = http.createServer((_req, res) => {
-    res.writeHead(200, { 'content-type': 'application/json' })
-    res.end(
-      JSON.stringify({ keys: [{ ...jwk, kid: KID, alg: 'RS256', use: 'sig' }] })
-    )
-  })
+  if (!nock.isActive()) {
+    nock.activate()
+  }
 
-  await /** @type {Promise<void>} */ (
-    new Promise((resolve, reject) => {
-      jwksServer.once('error', reject)
-      jwksServer.listen(0, '127.0.0.1', () => {
-        resolve()
-      })
-    })
-  )
+  // persist(): the key set is fetched once per built server, and a suite can
+  // build several — a one-shot interceptor would die after the first.
+  nock(JWKS_ORIGIN)
+    .persist()
+    .get(JWKS_PATH)
+    .reply(200, { keys: [{ ...jwk, kid: KID, alg: 'RS256', use: 'sig' }] })
 
-  const { port } = /** @type {AddressInfo} */ (jwksServer.address())
-  config.set(
-    'auth.jwt.jwksUri',
-    `http://127.0.0.1:${port}/.well-known/jwks.json`
-  )
+  config.set('auth.jwt.jwksUri', `${JWKS_ORIGIN}${JWKS_PATH}`)
 }
 
 /**
- * Closes the in-process JWKS server, so its cache timer does not keep Jest
- * alive after the suite finishes.
- * @returns {Promise<void>}
+ * Removes the interceptor and unpatches the http module.
  */
-export async function stopServiceAuthStub() {
-  await /** @type {Promise<void>} */ (
-    new Promise((resolve) => {
-      jwksServer.close(() => {
-        resolve()
-      })
-    })
-  )
+export function stopServiceAuthStub() {
+  nock.cleanAll()
+  nock.restore()
 }
 
 /**
- * Mints an RS256 token that verifies against the in-process JWKS server, so
- * tests present a real caller credential rather than bypassing the strategy.
+ * Mints an RS256 token that verifies against the intercepted JWKS, so tests
+ * present a real caller credential rather than bypassing the strategy.
  * @param {{ sub?: string, aud?: string, iss?: string, expiresInSeconds?: number }} [overrides]
  * @returns {string}
  */
@@ -90,8 +77,3 @@ export function mintToken(overrides = {}) {
 
   return `${signingInput}.${signature}`
 }
-
-/**
- * @import { Server } from 'node:http'
- * @import { AddressInfo } from 'node:net'
- */

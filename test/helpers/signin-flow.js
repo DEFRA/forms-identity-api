@@ -41,7 +41,7 @@ export function setupSigninFlow() {
   let server
 
   beforeAll(async () => {
-    await startServiceAuthStub()
+    startServiceAuthStub()
     mongod = await startMongoMemoryServer()
     server = await createServer()
     await server.initialize()
@@ -59,7 +59,7 @@ export function setupSigninFlow() {
     await server.stop()
     await client.close()
     await mongod.stop()
-    await stopServiceAuthStub()
+    stopServiceAuthStub()
   })
 
   /**
