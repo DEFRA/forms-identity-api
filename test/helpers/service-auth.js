@@ -5,6 +5,7 @@ import nock from 'nock'
 import { config } from '~/src/config/index.js'
 
 const KID = 'test-rs256'
+const TOKEN_TTL_SECONDS = 300
 
 // A fixed fake origin rather than an ephemeral port: nock intercepts the
 // request inside the process, so no socket ever opens and the URI can be a
@@ -67,7 +68,7 @@ export function mintToken(overrides = {}) {
     aud: config.get('auth.jwt.audience'),
     iss: config.get('auth.jwt.issuer'),
     iat: now,
-    exp: now + 300,
+    exp: now + TOKEN_TTL_SECONDS,
     ...overrides
   })
   const signingInput = `${header}.${payload}`
