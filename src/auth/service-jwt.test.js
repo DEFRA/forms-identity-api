@@ -101,7 +101,12 @@ describe('service-jwt', () => {
     const server = await buildServer()
 
     expect(
-      (await call(server, mintToken({ expiresInSeconds: -10 }))).statusCode
+      (
+        await call(
+          server,
+          mintToken({ exp: Math.floor(Date.now() / 1000) - 10 })
+        )
+      ).statusCode
     ).toBe(401)
   })
 

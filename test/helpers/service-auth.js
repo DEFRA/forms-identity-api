@@ -55,13 +55,11 @@ export function stopServiceAuthStub() {
 /**
  * Mints an RS256 token that verifies against the intercepted JWKS, so tests
  * present a real caller credential rather than bypassing the strategy.
- * @param {{ sub?: string, aud?: string, iss?: string, expiresInSeconds?: number }} [overrides]
+ * Overrides are claims, spread over the valid defaults.
+ * @param {{ sub?: string, aud?: string, iss?: string, exp?: number }} [overrides]
  * @returns {string}
  */
 export function mintToken(overrides = {}) {
-  // expiresInSeconds is an input for computing exp rather than a claim, so
-  // it is split off before the rest spreads into the payload
-  const { expiresInSeconds = 300, ...claims } = overrides
   const now = Math.floor(Date.now() / 1000)
   const header = encode({ alg: 'RS256', typ: 'JWT', kid: KID })
   const payload = encode({
@@ -69,8 +67,8 @@ export function mintToken(overrides = {}) {
     aud: config.get('auth.jwt.audience'),
     iss: config.get('auth.jwt.issuer'),
     iat: now,
-    exp: now + expiresInSeconds,
-    ...claims
+    exp: now + 300,
+    ...overrides
   })
   const signingInput = `${header}.${payload}`
   const signature = sign(
