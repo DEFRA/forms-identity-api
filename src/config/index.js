@@ -172,7 +172,7 @@ export const config = convict({
         default: 'http://localhost:4571/.well-known/jwks.json',
         env: 'CDP_JWT_JWKS_URI'
       },
-      /** @type {SchemaObj<string | null>} */
+      /** @type {SchemaObj<string>} */
       audience: {
         doc: 'Audience the caller must address the token to — this service. Read from SERVICE, which the platform sets to the repo name in every deployed environment, so the accepted audience cannot drift from the service itself. No default: a missing value stops the boot rather than starting a server with no expected audience.',
         format: String,
@@ -180,12 +180,12 @@ export const config = convict({
         env: 'SERVICE'
       }
     },
-    /** @type {SchemaObj<string | null>} */
+    /** @type {SchemaObj<string>} */
     allowedSubject: {
       doc: 'Complete expected `sub` of the caller token — the calling role ARN STS stamps onto it. CDP names task roles per environment, so this has no universal default and is required in production; the local default matches what aws-sts-stub mints.',
       format: String,
       default: isProduction
-        ? /** @type {string | null} */ (null)
+        ? null
         : 'arn:aws:iam::000000000000:role/forms-identity-ui',
       env: 'SERVICE_AUTH_ALLOWED_SUBJECT'
     }

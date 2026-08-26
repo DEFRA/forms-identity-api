@@ -14,7 +14,7 @@ import { config } from '~/src/config/index.js'
  * @returns {string}
  */
 export function expectedSubject() {
-  return /** @type {string} */ (config.get('auth.allowedSubject'))
+  return config.get('auth.allowedSubject')
 }
 
 /**
@@ -33,7 +33,7 @@ export const serviceJwt = {
     async register(server) {
       await server.register(Jwt)
 
-      const audience = /** @type {string} */ (config.get('auth.jwt.audience'))
+      const audience = config.get('auth.jwt.audience')
       const issuer = config.get('auth.jwt.issuer')
       const sub = expectedSubject()
 
