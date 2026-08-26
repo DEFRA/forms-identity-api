@@ -20,8 +20,8 @@ describe('Health route', () => {
   let server
 
   beforeAll(async () => {
-    // The server-wide auth default warms its JWKS cache on initialize, so
-    // this needs a reachable key set even though /health itself opts out.
+    // The server-wide auth default fetches the JWKS key set on initialize,
+    // so a key set must be reachable even though /health opts out of auth.
     startServiceAuthStub()
     server = await createServer()
     await server.initialize()

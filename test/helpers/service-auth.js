@@ -8,8 +8,7 @@ const KID = 'test-rs256'
 const TOKEN_TTL_SECONDS = 300
 
 // A fixed fake origin rather than an ephemeral port: nock intercepts the
-// request inside the process, so no socket ever opens and the URI can be a
-// constant.
+// request inside the process, so no socket opens.
 const JWKS_ORIGIN = 'http://sts.test'
 const JWKS_PATH = '/.well-known/jwks.json'
 
@@ -25,8 +24,8 @@ const encode = (value) =>
 
 /**
  * Intercepts the JWKS fetch with nock and points config at the fake origin,
- * so a suite's server.initialize() finds a key set to warm its cache from.
- * The Wreck client path still runs; only the transport is intercepted.
+ * so server.initialize() finds a key set. Only the transport is intercepted;
+ * the Wreck client path still runs.
  */
 export function startServiceAuthStub() {
   const jwk = createPublicKey(privateKey).export({ format: 'jwk' })
@@ -35,8 +34,8 @@ export function startServiceAuthStub() {
     nock.activate()
   }
 
-  // persist(): the key set is fetched once per built server, and a suite can
-  // build several — a one-shot interceptor would die after the first.
+  // persist(): each built server fetches the key set once, and a suite can
+  // build several servers. A one-shot interceptor stops after the first.
   nock(JWKS_ORIGIN)
     .persist()
     .get(JWKS_PATH)
@@ -56,7 +55,7 @@ export function stopServiceAuthStub() {
 /**
  * Mints an RS256 token that verifies against the intercepted JWKS, so tests
  * present a real caller credential rather than bypassing the strategy.
- * Overrides are claims, spread over the valid defaults.
+ * Overrides are claims that replace the valid defaults.
  * @param {{ sub?: string, aud?: string, iss?: string, exp?: number }} [overrides]
  * @returns {string}
  */

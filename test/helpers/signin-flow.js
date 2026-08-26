@@ -63,9 +63,8 @@ export function setupSigninFlow() {
   })
 
   /**
-   * Injects a request into the running server as the allowed caller, so flow
-   * tests exercise the routes behind the same token check production
-   * enforces rather than bypassing it.
+   * Injects a request into the running server as the allowed caller, so
+   * flow tests pass the same token check that production enforces.
    * @param {import('@hapi/hapi').ServerInjectOptions} options
    */
   const inject = (options) =>
@@ -78,9 +77,8 @@ export function setupSigninFlow() {
     })
 
   /**
-   * Injects a request with no bearer token, so a test can prove the
-   * deny-by-default policy actually refuses an unauthenticated caller end
-   * to end, on the same server every other test in the suite talks to.
+   * Injects a request with no bearer token, so a test can show that the
+   * full server refuses an unauthenticated caller.
    * @param {import('@hapi/hapi').ServerInjectOptions} options
    */
   const injectWithoutToken = (options) => server.inject(options)

@@ -33,10 +33,9 @@ services:
       ME_CONFIG_BASICAUTH: false
 
   aws-sts-stub:
-    # Stub of the AWS STS GetWebIdentityToken API. Every request to this API
-    # needs a caller token verified against the stub's JWKS endpoint, and
-    # `@hapi/jwt` fetches that key set as the server initialises, so the stub
-    # must be up before `npm run dev`.
+    # Stub of the AWS STS GetWebIdentityToken API. This service verifies
+    # caller tokens against the stub's JWKS endpoint. `@hapi/jwt` fetches the
+    # key set at server start, so start the stub before `npm run dev`.
     image: defradigital/aws-sts-stub:latest
     restart: unless-stopped
     ports:

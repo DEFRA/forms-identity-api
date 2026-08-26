@@ -12,10 +12,10 @@ import {
 const servers = []
 
 /**
- * Builds a bare server with the strategy registered directly, so each test
- * controls its own routes and auth options rather than the full app wiring.
- * requestLogger is registered first, matching the real server, because the
- * strategy logs through `server.logger` at registration.
+ * Builds a bare server with only the strategy registered, so each test
+ * controls its own routes and auth options. requestLogger goes first, as in
+ * the real server, because the strategy logs through `server.logger` when
+ * it registers.
  * @returns {Promise<HapiServer>}
  */
 async function buildServer() {
@@ -53,7 +53,7 @@ beforeAll(startServiceAuthStub)
 
 afterAll(async () => {
   // Stopping each server clears its JWKS cache timer, so the process can
-  // exit rather than waiting on cached-key expiry.
+  // exit without waiting for the cached keys to expire.
   await Promise.all(servers.map((server) => server.stop()))
   stopServiceAuthStub()
 })

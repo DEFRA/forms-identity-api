@@ -174,7 +174,7 @@ export const config = convict({
       },
       /** @type {SchemaObj<string>} */
       audience: {
-        doc: 'Audience the caller must address the token to — this service. Read from SERVICE, which the platform sets to the repo name in every deployed environment, so the accepted audience cannot drift from the service itself. No default: a missing value stops the boot rather than starting a server with no expected audience.',
+        doc: 'Audience the caller token must name: this service. Read from SERVICE, which the platform sets to the repo name, so the accepted audience cannot drift from the service. No default: a missing value stops the boot.',
         format: String,
         default: null,
         env: 'SERVICE'
@@ -182,7 +182,7 @@ export const config = convict({
     },
     /** @type {SchemaObj<string>} */
     allowedSubject: {
-      doc: 'Complete expected `sub` of the caller token — the calling role ARN STS stamps onto it. CDP names task roles per environment, so this has no universal default and is required in production; the local default matches what aws-sts-stub mints.',
+      doc: 'Full expected `sub` of the caller token: the calling role ARN. CDP names task roles per environment, so there is no universal default and production must set it. The local default matches the token aws-sts-stub mints.',
       format: String,
       default: isProduction
         ? null

@@ -3,9 +3,9 @@ import Jwt from '@hapi/jwt'
 import { config } from '~/src/config/index.js'
 
 /**
- * Use AWS Web Identity to verify that only a single service
- * (forms-identity-ui) can call this service. We verify the tokens that AWS
- * issued and assert the subject is as we expect.
+ * Verifies AWS Web Identity tokens so that only forms-identity-ui can call
+ * this service. Checks the signature, issuer, audience and subject of each
+ * caller token.
  * @satisfies {ServerRegisterPluginObject<void>}
  */
 export const serviceJwt = {
