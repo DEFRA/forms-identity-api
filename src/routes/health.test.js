@@ -37,9 +37,6 @@ describe('Health route', () => {
 
   describe('Success responses', () => {
     test('Testing GET /health route returns 200', async () => {
-      // No Authorization header: /health is the one endpoint the
-      // deny-by-default policy exempts, and that is an acceptance
-      // criterion, so it is asserted explicitly.
       const response = await server.inject({
         method: 'GET',
         url: '/health'
