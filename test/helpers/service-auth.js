@@ -59,14 +59,18 @@ export function stopServiceAuthStub() {
  * @returns {string}
  */
 export function mintToken(overrides = {}) {
+  // expiresInSeconds is an input for computing exp rather than a claim, so
+  // it is split off before the rest spreads into the payload
+  const { expiresInSeconds = 300, ...claims } = overrides
   const now = Math.floor(Date.now() / 1000)
   const header = encode({ alg: 'RS256', typ: 'JWT', kid: KID })
   const payload = encode({
-    sub: overrides.sub ?? config.get('auth.allowedSubject'),
-    aud: overrides.aud ?? config.get('auth.jwt.audience'),
-    iss: overrides.iss ?? config.get('auth.jwt.issuer'),
+    sub: config.get('auth.allowedSubject'),
+    aud: config.get('auth.jwt.audience'),
+    iss: config.get('auth.jwt.issuer'),
     iat: now,
-    exp: now + (overrides.expiresInSeconds ?? 300)
+    exp: now + expiresInSeconds,
+    ...claims
   })
   const signingInput = `${header}.${payload}`
   const signature = sign(
