@@ -1,6 +1,7 @@
 process.env.NODE_ENV = 'test'
 process.env.HOST = '0.0.0.0'
 process.env.PORT = '3010'
+process.env.SERVICE = 'forms-identity-api'
 process.env.SERVICE_VERSION = 'test'
 
 process.env.LOG_ENABLED = 'false'

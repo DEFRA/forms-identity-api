@@ -156,6 +156,40 @@ export const config = convict({
       }
     }
   },
+  auth: {
+    jwt: {
+      /** @type {SchemaObj<string>} */
+      issuer: {
+        doc: 'Issuer that must have signed the caller token. Set by the platform in deployed environments; the local default is the aws-sts-stub constant.',
+        format: String,
+        default: 'https://local.tokens.sts.global.api.aws',
+        env: 'CDP_JWT_ISSUER'
+      },
+      /** @type {SchemaObj<string>} */
+      jwksUri: {
+        doc: 'Public keys that verify the caller token',
+        format: String,
+        default: 'http://localhost:4571/.well-known/jwks.json',
+        env: 'CDP_JWT_JWKS_URI'
+      },
+      /** @type {SchemaObj<string>} */
+      audience: {
+        doc: 'Audience the caller token must name: this service. Read from SERVICE, which the platform sets to the repo name, so the accepted audience cannot drift from the service. No default: a missing value stops the boot.',
+        format: String,
+        default: null,
+        env: 'SERVICE'
+      }
+    },
+    /** @type {SchemaObj<string>} */
+    allowedSubject: {
+      doc: 'Full expected `sub` of the caller token: the calling role ARN. CDP names task roles per environment, so there is no universal default and production must set it. The local default matches the token aws-sts-stub mints.',
+      format: String,
+      default: isProduction
+        ? null
+        : 'arn:aws:iam::000000000000:role/forms-identity-ui',
+      env: 'SERVICE_AUTH_ALLOWED_SUBJECT'
+    }
+  },
   /** @type {SchemaObj<string>} */
   httpProxy: {
     doc: 'HTTP Proxy',

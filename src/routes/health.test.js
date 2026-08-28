@@ -1,4 +1,8 @@
 import { createServer } from '~/src/api/server.js'
+import {
+  startServiceAuthStub,
+  stopServiceAuthStub
+} from '~/test/helpers/service-auth.js'
 
 jest.mock('~/src/mongo.js', () => ({
   prepareDb: jest.fn(),
@@ -16,12 +20,16 @@ describe('Health route', () => {
   let server
 
   beforeAll(async () => {
+    // The server-wide auth default fetches the JWKS key set on initialize,
+    // so a key set must be reachable even though /health opts out of auth.
+    startServiceAuthStub()
     server = await createServer()
     await server.initialize()
   })
 
-  afterAll(() => {
-    return server.stop()
+  afterAll(async () => {
+    await server.stop()
+    stopServiceAuthStub()
   })
 
   const okStatusCode = 200
