@@ -2,6 +2,8 @@ import Jwt from '@hapi/jwt'
 
 import { config } from '~/src/config/index.js'
 
+const PLUGIN_NAME = 'service-jwt'
+
 /**
  * Verifies AWS Web Identity tokens so that only forms-identity-ui can call
  * this service. Checks the signature, issuer, audience and subject of each
@@ -10,7 +12,7 @@ import { config } from '~/src/config/index.js'
  */
 export const serviceJwt = {
   plugin: {
-    name: 'service-jwt',
+    name: PLUGIN_NAME,
     async register(server) {
       await server.register(Jwt)
 
@@ -19,7 +21,7 @@ export const serviceJwt = {
       const jwksUri = config.get('auth.jwt.jwksUri')
       const sub = config.get('auth.allowedSubject')
 
-      server.auth.strategy('service-jwt', 'jwt', {
+      server.auth.strategy(PLUGIN_NAME, 'jwt', {
         keys: {
           uri: jwksUri,
           algorithms: ['RS256']
@@ -28,7 +30,7 @@ export const serviceJwt = {
         validate: false
       })
 
-      server.auth.default('service-jwt')
+      server.auth.default(PLUGIN_NAME)
     }
   }
 }
