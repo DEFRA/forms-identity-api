@@ -14,7 +14,9 @@ describe('one-time-code lifecycle', () => {
       await verify('uid-burn', '000000')
     }
 
-    expect(await verify('uid-burn', code)).toEqual({ status: 'invalid' })
+    expect(await verify('uid-burn', code)).toEqual({
+      status: 'invalid-code-consumed-or-expired'
+    })
   }, 15_000)
 
   it('a resend invalidates the old code and restores the attempt budget', async () => {
@@ -40,7 +42,9 @@ describe('one-time-code lifecycle', () => {
         { $set: { expireAt: new Date(Date.now() - 1000) } }
       )
 
-    expect(await verify('uid-expired', code)).toEqual({ status: 'invalid' })
+    expect(await verify('uid-expired', code)).toEqual({
+      status: 'invalid-code-consumed-or-expired'
+    })
   })
 
   it('surfaces a Notify outage as a 500, and a resend recovers the interaction', async () => {
