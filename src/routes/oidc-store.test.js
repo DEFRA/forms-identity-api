@@ -132,7 +132,7 @@ describe('oidc store routes', () => {
 
   it('consume, destroy and grant revocation return 204', async () => {
     jest.mocked(consume).mockResolvedValue(undefined)
-    jest.mocked(destroy).mockResolvedValue(undefined)
+    jest.mocked(destroy).mockResolvedValue({})
     jest.mocked(revokeByGrantId).mockResolvedValue(undefined)
     const server = await buildServer()
 
@@ -163,7 +163,9 @@ describe('oidc store routes', () => {
     jest.mocked(destroy).mockResolvedValue({ accountId: 'acc-1', uid: 'u-1' })
     jest
       .mocked(accountsRepository.findById)
-      .mockResolvedValue({ _id: 'acc-1', email: 'citizen@example.com' })
+      .mockResolvedValue(
+        /** @type {never} */ ({ _id: 'acc-1', email: 'citizen@example.com' })
+      )
     const server = await buildServer()
 
     const res = await server.inject({
@@ -187,6 +189,21 @@ describe('oidc store routes', () => {
 
     expect(res.statusCode).toBe(204)
     expect(accountsRepository.findById).not.toHaveBeenCalled()
+    expect(auditSignOut).not.toHaveBeenCalled()
+  })
+
+  it('does not audit a sign-out for a session that where the account is not found', async () => {
+    jest.mocked(destroy).mockResolvedValue({ accountId: 'acc-1', uid: 'u-1' })
+    jest.mocked(accountsRepository.findById).mockResolvedValue(null)
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'DELETE',
+      url: '/oidc/session/id-5'
+    })
+
+    expect(res.statusCode).toBe(204)
+    expect(accountsRepository.findById).toHaveBeenCalled()
     expect(auditSignOut).not.toHaveBeenCalled()
   })
 
