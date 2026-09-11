@@ -7,6 +7,7 @@ import { config } from '~/src/config/index.js'
 import { PURPOSE, STATUS } from '~/src/constants.js'
 import {
   auditOtpIssued,
+  auditOtpLockout,
   auditRegistration,
   auditSignIn
 } from '~/src/lib/audit.js'
@@ -14,12 +15,16 @@ import { sendEmail } from '~/src/lib/notify.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
+import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
 const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
 const OTP_EXPIRY_MINUTES = Math.round(OTP_TTL_SECONDS / 60)
 const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
+const LOCKOUT_MAX_REQUESTS = config.get('otp.lockout.maxRequests')
+const LOCKOUT_WINDOW_MS = config.get('otp.lockout.windowSeconds') * 1000
+const LOCKOUT_MS = config.get('otp.lockout.durationSeconds') * 1000
 
 // Every OTP operation filters on {uid, purpose} — never uid alone — so codes
 // are isolated per interaction and per purpose.
@@ -27,12 +32,22 @@ const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
 /**
  * Issues a 6-digit code, stores only its argon2 hash keyed by
  * {uid, purpose} (upsert = resend semantics: one live code per authority
- * per interaction) and delivers the plaintext via Notify
+ * per interaction) and delivers the plaintext via Notify.
+ *
+ * Refuses to issue anything while the address is locked out for asking too
+ * often — see {@link claimOtpRequest}.
  * @param {string} uid
  * @param {string} email
+ * @returns {Promise<RequestResult>}
  */
 export async function requestOtp(uid, email) {
   const target = email.toLowerCase()
+  const lockedUntil = await claimOtpRequest(uid, target)
+
+  if (lockedUntil) {
+    return { status: STATUS.LOCKED_OUT, lockedUntil: lockedUntil.toISOString() }
+  }
+
   const code = generateCode()
   const codeHash = await argon2.hash(code)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
@@ -52,6 +67,93 @@ export async function requestOtp(uid, email) {
   await sendOtpEmail(target, code)
 
   auditOtpIssued(uid, target)
+
+  return { status: STATUS.OTP_ISSUED }
+}
+
+/**
+ * Counts this request against the address's rolling window and reports when
+ * the address may next ask for a code, or null when this request is allowed.
+ *
+ * The counter is keyed on the address alone, not on the interaction, so
+ * starting a fresh interaction for every request does not buy a fresh count.
+ * @param {string} uid
+ * @param {string} target - lowercased email
+ * @returns {Promise<Date | null>} when the lockout lifts, or null if not locked out
+ */
+async function claimOtpRequest(uid, target) {
+  const now = new Date()
+  const key = { target }
+  const existing = await otpLockoutsRepository.findOne(key)
+
+  if (existing?.lockedUntil && existing.lockedUntil.getTime() > now.getTime()) {
+    return existing.lockedUntil
+  }
+
+  if (existing && hasWindowElapsed(existing, now)) {
+    // Filter condition in the update to prevent race condition where
+    // we reset a non-elapsed, non-zero lockout record.
+    await otpLockoutsRepository.update(
+      { ...key, windowStartedAt: existing.windowStartedAt },
+      { windowStartedAt: now, requests: 0, lockedUntil: null }
+    )
+  }
+
+  const counter = await otpLockoutsRepository.incrementRequests(
+    key,
+    { expireAt: new Date(now.getTime() + LOCKOUT_WINDOW_MS + LOCKOUT_MS) },
+    { windowStartedAt: now, lockedUntil: null }
+  )
+
+  if (counter.requests <= LOCKOUT_MAX_REQUESTS) {
+    return null
+  }
+
+  const lockedUntil = new Date(now.getTime() + LOCKOUT_MS)
+
+  const locked = await otpLockoutsRepository.update(
+    { ...key, lockedUntil: null },
+    { lockedUntil }
+  )
+
+  if (locked) {
+    auditOtpLockout(uid, target, lockedUntil)
+  }
+
+  return lockedUntil
+}
+
+/**
+ * Whether the counter that was just read belongs to a window that is over,
+ * so this request starts a new count.
+ *
+ * A lockout ends its own window: once it lifts the address gets a clean
+ * count, otherwise the requests that caused it would lock it again at once.
+ *
+ * Mongo TTL is lazy and isn't evaluated in real time, so the window is
+ * checked in-app rather than trusted to have been swept away.
+ * @param {OtpLockoutDocument} counter
+ * @param {Date} now
+ */
+function hasWindowElapsed(counter, now) {
+  if (counter.lockedUntil) {
+    return counter.lockedUntil.getTime() <= now.getTime()
+  }
+
+  return counter.windowStartedAt.getTime() + LOCKOUT_WINDOW_MS <= now.getTime()
+}
+
+/**
+ * Puts the code request count for an address back to zero, so the next
+ * sign-in starts with a full budget.
+ *
+ * A completed sign-in proves the codes were reaching the person who owns the
+ * address, so the count they ran up getting in should not follow them into
+ * their next sign-in.
+ * @param {string} target - lowercased email
+ */
+function clearRequestCount(target) {
+  return otpLockoutsRepository.clear({ target })
 }
 
 /**
@@ -121,6 +223,8 @@ export async function verifyOtp(uid, code) {
   const account = await accountsRepository.findByEmail(doc.target)
 
   if (account) {
+    await clearRequestCount(doc.target)
+
     const consumed = await otpsRepository.update(claim, { consumed: true })
 
     if (!consumed) {
@@ -212,6 +316,8 @@ export async function completeSignup(uid, phone) {
 
   const account = await createAccount(doc.target, phoneNumber)
 
+  await clearRequestCount(doc.target)
+
   const consumed = await otpsRepository.update(filter, { consumed: true })
 
   if (!consumed) {
@@ -296,6 +402,8 @@ export async function findAccountById(id) {
  * @import { Filter } from 'mongodb'
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
+ * @import { OtpLockoutDocument } from '~/src/repositories/otp-lockouts-repository.js'
+ * @typedef {{ status: 'otp-issued' } | { status: 'locked-out', lockedUntil: string }} RequestResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */

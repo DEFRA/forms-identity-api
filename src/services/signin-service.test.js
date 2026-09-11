@@ -4,11 +4,13 @@ import argon2 from 'argon2'
 import { PURPOSE } from '~/src/constants.js'
 import {
   auditOtpIssued,
+  auditOtpLockout,
   auditRegistration,
   auditSignIn
 } from '~/src/lib/audit.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
+import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import {
   completeSignup,
@@ -25,6 +27,12 @@ jest.mock('~/src/repositories/otps-repository.js', () => ({
   update: jest.fn(),
   incrementAttempts: jest.fn()
 }))
+jest.mock('~/src/repositories/otp-lockouts-repository.js', () => ({
+  findOne: jest.fn(),
+  update: jest.fn(),
+  clear: jest.fn(),
+  incrementRequests: jest.fn()
+}))
 jest.mock('~/src/repositories/accounts-repository.js', () => ({
   findByEmail: jest.fn(),
   findById: jest.fn(),
@@ -36,13 +44,40 @@ jest.mock('~/src/lib/notify.js', () => ({
 }))
 jest.mock('~/src/lib/audit.js', () => ({
   auditOtpIssued: jest.fn(),
+  auditOtpLockout: jest.fn(),
   auditSignIn: jest.fn(),
   auditRegistration: jest.fn()
 }))
 
+/** Codes an address may request in a window before it is locked out */
+const MAX_REQUESTS = 5
+
+/** Lockout window and lockout length, both two hours by default */
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000
+
 /**
  * @typedef {Record<string, any>} Doc
  */
+
+/**
+ * The lockout counters the mocked repository is holding for the test in
+ * hand — build() replaces them, so a test can age one to move time on
+ * @type {Doc[]}
+ */
+let counters = []
+
+/**
+ * Equality as a database applies it: two Dates for the same instant match,
+ * even though they are different objects
+ * @param {unknown} a
+ * @param {unknown} b
+ */
+function equal(a, b) {
+  if (a instanceof Date && b instanceof Date) {
+    return a.getTime() === b.getTime()
+  }
+  return a === b
+}
 
 /**
  * Backs the mocked otps repository with an in-memory record list so the
@@ -87,10 +122,80 @@ function build() {
     doc.attempts = Number(doc.attempts ?? 0) + 1
     return Promise.resolve(/** @type {never} */ (doc))
   })
+  buildLockouts()
   jest.mocked(sendEmail).mockResolvedValue(undefined)
   jest.mocked(accountsRepository.findByEmail).mockResolvedValue(null)
 
   return docs
+}
+
+/**
+ * Backs the mocked lockout repository with an in-memory counter list, so the
+ * count, the window and the lockout are exercised against real filter
+ * semantics rather than stubbed answers
+ */
+function buildLockouts() {
+  counters = []
+  let nextId = 1
+
+  /** @param {Doc} filter */
+  const match = (filter) =>
+    counters.find((d) =>
+      Object.entries(filter).every(([k, v]) => equal(d[k], v))
+    )
+
+  jest.mocked(otpLockoutsRepository.findOne).mockImplementation((filter) => {
+    const doc = match(filter)
+    return Promise.resolve(/** @type {never} */ (doc ? { ...doc } : null))
+  })
+  jest
+    .mocked(otpLockoutsRepository.update)
+    .mockImplementation((filter, fields) => {
+      const doc = match(filter)
+      if (doc) {
+        Object.assign(doc, fields)
+      }
+      return Promise.resolve(Boolean(doc))
+    })
+  jest.mocked(otpLockoutsRepository.clear).mockImplementation((filter) => {
+    const doc = match(filter)
+    if (doc) {
+      counters.splice(counters.indexOf(doc), 1)
+    }
+    return Promise.resolve()
+  })
+  jest
+    .mocked(otpLockoutsRepository.incrementRequests)
+    .mockImplementation((key, fields, onInsert) => {
+      let doc = match(key)
+      if (!doc) {
+        doc = {
+          _id: nextId++,
+          createdAt: new Date(),
+          requests: 0,
+          ...key,
+          ...onInsert
+        }
+        counters.push(doc)
+      }
+      Object.assign(doc, fields)
+      doc.requests = Number(doc.requests ?? 0) + 1
+      return Promise.resolve(/** @type {never} */ ({ ...doc }))
+    })
+}
+
+/**
+ * Moves the counter for an address back in time by the given milliseconds,
+ * which is how these tests age a window or a lockout out
+ * @param {string} target
+ * @param {number} ms
+ */
+function ageCounter(target, ms) {
+  const counter = /** @type {Doc} */ (counters.find((d) => d.target === target))
+  counter.windowStartedAt = new Date(counter.windowStartedAt.getTime() - ms)
+  if (counter.lockedUntil) {
+    counter.lockedUntil = new Date(counter.lockedUntil.getTime() - ms)
+  }
 }
 
 /**
@@ -185,6 +290,233 @@ describe('signin service', () => {
         'Notify is down'
       )
       expect(auditOtpIssued).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('requestOtp lockout', () => {
+    it('issues the codes up to the limit', async () => {
+      build()
+
+      for (let i = 0; i < MAX_REQUESTS; i++) {
+        await expect(requestOtp(`uid-${i}`, 'a@b.com')).resolves.toEqual({
+          status: 'otp-issued'
+        })
+      }
+
+      expect(sendEmail).toHaveBeenCalledTimes(MAX_REQUESTS)
+      expect(auditOtpLockout).not.toHaveBeenCalled()
+    })
+
+    it('locks the address out on the request past the limit, sending no code', async () => {
+      const docs = build()
+      for (let i = 0; i < MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+      jest.mocked(sendEmail).mockClear()
+
+      const result = await requestOtp('uid-over', 'a@b.com')
+
+      expect(result).toEqual({
+        status: 'locked-out',
+        lockedUntil: expect.any(String)
+      })
+      expect(sendEmail).not.toHaveBeenCalled()
+      expect(auditOtpIssued).toHaveBeenCalledTimes(MAX_REQUESTS)
+      // the refused request leaves no code behind for the interaction it
+      // was made on, so there is nothing to verify against
+      expect(docs.some((doc) => doc.uid === 'uid-over')).toBe(false)
+    })
+
+    it('locks out for the configured duration and audits it once', async () => {
+      build()
+      const before = Date.now()
+
+      for (let i = 0; i <= MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+      await requestOtp('uid-again', 'a@b.com')
+
+      const lockedUntil = counters[0].lockedUntil.getTime()
+      expect(lockedUntil).toBeGreaterThanOrEqual(before + TWO_HOURS_MS)
+      expect(lockedUntil).toBeLessThanOrEqual(Date.now() + TWO_HOURS_MS)
+      expect(auditOtpLockout).toHaveBeenCalledTimes(1)
+      expect(auditOtpLockout).toHaveBeenCalledWith(
+        'uid-5',
+        'a@b.com',
+        new Date(lockedUntil)
+      )
+    })
+
+    it('keeps refusing while the lockout holds, without pushing the clock out', async () => {
+      build()
+      for (let i = 0; i <= MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+      const lockedUntil = counters[0].lockedUntil
+
+      const result = await requestOtp('uid-later', 'a@b.com')
+
+      expect(result).toEqual({
+        status: 'locked-out',
+        lockedUntil: lockedUntil.toISOString()
+      })
+      expect(counters[0].lockedUntil).toEqual(lockedUntil)
+      expect(auditOtpLockout).toHaveBeenCalledTimes(1)
+    })
+
+    it('counts requests against the address, not the interaction', async () => {
+      // a fresh interaction per request is exactly what an attacker would
+      // do, so the count has to follow the address
+      build()
+      /** @type {Awaited<ReturnType<typeof requestOtp>>} */
+      let result = { status: 'otp-issued' }
+
+      for (let i = 0; i <= MAX_REQUESTS; i++) {
+        result = await requestOtp(`uid-${i}`, 'A@B.com')
+      }
+
+      expect(result).toEqual({
+        status: 'locked-out',
+        lockedUntil: expect.any(String)
+      })
+    })
+
+    it('counts each address separately', async () => {
+      build()
+      for (let i = 0; i <= MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+
+      await expect(requestOtp('uid-other', 'c@d.com')).resolves.toEqual({
+        status: 'otp-issued'
+      })
+    })
+
+    it('starts the count again once the lockout has passed', async () => {
+      build()
+      for (let i = 0; i <= MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+
+      ageCounter('a@b.com', TWO_HOURS_MS)
+
+      await expect(requestOtp('uid-after', 'a@b.com')).resolves.toEqual({
+        status: 'otp-issued'
+      })
+      expect(counters[0].requests).toBe(1)
+      expect(counters[0].lockedUntil).toBeNull()
+    })
+
+    it('starts the count again once the window has passed without a lockout', async () => {
+      build()
+      for (let i = 0; i < MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+
+      ageCounter('a@b.com', TWO_HOURS_MS)
+
+      await expect(requestOtp('uid-after', 'a@b.com')).resolves.toEqual({
+        status: 'otp-issued'
+      })
+      expect(counters[0].requests).toBe(1)
+    })
+
+    it('keeps counting within the window when it has not elapsed', async () => {
+      build()
+      for (let i = 0; i < MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+
+      ageCounter('a@b.com', TWO_HOURS_MS - 60_000) // a minute of window left
+
+      await expect(requestOtp('uid-over', 'a@b.com')).resolves.toEqual({
+        status: 'locked-out',
+        lockedUntil: expect.any(String)
+      })
+    })
+
+    it('puts the count back to zero when an existing account signs in', async () => {
+      const docs = build()
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(
+          /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
+        )
+      const code = await request('uid-0')
+      for (let i = 1; i < MAX_REQUESTS; i++) {
+        await request(`uid-${i}`)
+      }
+
+      expect(await verifyOtp('uid-0', code)).toEqual({
+        status: 'signed-in',
+        accountId: 'acc-1'
+      })
+
+      expect(counters).toHaveLength(0)
+      // the request that would have locked the address now gets a code
+      await expect(requestOtp('uid-next', 'a@b.com')).resolves.toEqual({
+        status: 'otp-issued'
+      })
+      expect(docs.some((doc) => doc.uid === 'uid-next')).toBe(true)
+    })
+
+    it('puts the count back to zero when a new account completes signup', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.insert)
+        .mockImplementation((account) => Promise.resolve(account))
+      const code = await request('uid-0')
+      for (let i = 1; i < MAX_REQUESTS; i++) {
+        await request(`uid-${i}`)
+      }
+      await verifyOtp('uid-0', code)
+
+      expect(await completeSignup('uid-0', '07911 123456')).toEqual({
+        status: 'signed-in',
+        accountId: expect.any(String)
+      })
+
+      expect(counters).toHaveLength(0)
+      await expect(requestOtp('uid-next', 'a@b.com')).resolves.toEqual({
+        status: 'otp-issued'
+      })
+    })
+
+    it('leaves the count alone until the sign-in actually completes', async () => {
+      // the right code with no account yet only opens the phone step: the
+      // budget goes back when the citizen is in, not on the way there
+      build()
+      const code = await request('uid-0')
+
+      expect(await verifyOtp('uid-0', code)).toEqual({
+        status: 'phone-required'
+      })
+
+      expect(counters[0].requests).toBe(1)
+    })
+
+    it('leaves the count alone on a wrong code', async () => {
+      build()
+      await request('uid-0')
+
+      await verifyOtp('uid-0', '000001')
+
+      expect(counters[0].requests).toBe(1)
+    })
+
+    it('does not audit a lockout a concurrent request has already recorded', async () => {
+      // two requests go past the limit at once: only the one whose write
+      // lands owns the lockout, and only it writes the audit record
+      build()
+      for (let i = 0; i < MAX_REQUESTS; i++) {
+        await requestOtp(`uid-${i}`, 'a@b.com')
+      }
+      jest.mocked(otpLockoutsRepository.update).mockResolvedValue(false)
+
+      const result = await requestOtp('uid-over', 'a@b.com')
+
+      expect(result.status).toBe('locked-out')
+      expect(auditOtpLockout).not.toHaveBeenCalled()
     })
   })
 

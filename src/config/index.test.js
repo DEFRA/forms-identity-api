@@ -36,6 +36,12 @@ describe('config', () => {
     expect(config.get('otp.maxAttempts')).toBe(5)
   })
 
+  it('should configure the request lockout as five codes per two hours', () => {
+    expect(config.get('otp.lockout.maxRequests')).toBe(5)
+    expect(config.get('otp.lockout.windowSeconds')).toBe(7200)
+    expect(config.get('otp.lockout.durationSeconds')).toBe(7200)
+  })
+
   it('should read Notify credentials from the environment', () => {
     expect(config.get('otp.notify.apiKey')).toBe(process.env.NOTIFY_API_KEY)
     expect(config.get('otp.notify.templateId')).toBe(

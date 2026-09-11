@@ -1,4 +1,3 @@
-import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { joi as telephoneJoi } from '~/src/lib/telephone.js'
@@ -28,12 +27,11 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
-    async handler(request, h) {
+    handler(request) {
       const { uid, email } = /** @type {{ uid: string, email: string }} */ (
         request.payload
       )
-      await requestOtp(uid, email)
-      return h.response().code(StatusCodes.NO_CONTENT)
+      return requestOtp(uid, email)
     }
   },
   {

@@ -1,6 +1,7 @@
 import {
   ACCOUNTS_COLLECTION_NAME,
   OTPS_COLLECTION_NAME,
+  OTP_LOCKOUTS_COLLECTION_NAME,
   db
 } from '~/src/mongo.js'
 import { createAccount } from '~/src/services/signin-service.js'
@@ -26,7 +27,7 @@ describe('concurrency', () => {
     // index. That is left to fail rather than retried here: the fix belongs
     // upstream, where the UI stops a citizen submitting twice.
     const responses = await Promise.all(
-      Array.from({ length: 8 }, () =>
+      Array.from({ length: 4 }, () =>
         inject({
           method: 'POST',
           url: '/otp/request',
@@ -35,9 +36,42 @@ describe('concurrency', () => {
       )
     )
 
-    expect(responses.some((res) => res.statusCode === 204)).toBe(true)
+    expect(
+      responses.some(
+        (res) =>
+          res.statusCode === 200 &&
+          JSON.parse(res.payload).status === 'otp-issued'
+      )
+    ).toBe(true)
     await expect(
       db.collection(OTPS_COLLECTION_NAME).countDocuments({ uid: 'uid-race' })
+    ).resolves.toBe(1)
+  })
+
+  it('never lets a burst of requests take an address past the limit', async () => {
+    // the count is an atomic increment, so eight requests in flight at once
+    // get eight distinct numbers: five codes go out and the rest are refused
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        inject({
+          method: 'POST',
+          url: '/otp/request',
+          payload: { uid: `uid-burst-${i}`, email: 'burst@example.com' }
+        })
+      )
+    )
+
+    const statuses = responses.map((res) => {
+      expect(res.statusCode).toBe(200)
+      return JSON.parse(res.payload).status
+    })
+
+    expect(statuses.filter((status) => status === 'otp-issued')).toHaveLength(5)
+    expect(statuses.filter((status) => status === 'locked-out')).toHaveLength(3)
+    await expect(
+      db
+        .collection(OTP_LOCKOUTS_COLLECTION_NAME)
+        .countDocuments({ target: 'burst@example.com' })
     ).resolves.toBe(1)
   })
 
