@@ -102,7 +102,7 @@ export async function consume(model, id) {
 export async function destroy(model, id) {
   const doc = await db
     .collection(model)
-    .findOneAndDelete({ _id: new Object(id) })
+    .findOneAndDelete({ _id: /** @type {never} */ (id) })
 
   return doc?.payload ?? null
 }
