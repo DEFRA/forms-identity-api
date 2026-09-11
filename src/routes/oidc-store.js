@@ -1,6 +1,8 @@
 import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
+import { auditSignOut } from '~/src/lib/audit.js'
+import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import {
   MODEL_COLLECTIONS,
   consume,
@@ -10,6 +12,9 @@ import {
   revokeByGrantId,
   upsert
 } from '~/src/repositories/oidc-repository.js'
+
+/** oidc-provider's model name for a browser session */
+const SESSION_MODEL = 'session'
 
 /** One artefact by model and id — the same address for read, write and delete */
 const MODEL_ID_PATH = '/oidc/{model}/{id}'
@@ -106,7 +111,20 @@ export default [
     /** @param {ModelIdRequest} request */
     async handler(request, h) {
       const { model, id } = request.params
-      await destroy(model, id)
+      const payload = await destroy(model, id)
+
+      // A session's end is a sign-out, but only when it actually held an
+      // account (oidc-provider also destroys sessions that never signed in)
+      if (model === SESSION_MODEL && payload?.accountId) {
+        const account = await accountsRepository.findById(
+          /** @type {string} */ (payload.accountId)
+        )
+
+        if (account) {
+          auditSignOut(account._id, account.email)
+        }
+      }
+
       return h.response().code(StatusCodes.NO_CONTENT)
     }
   }
