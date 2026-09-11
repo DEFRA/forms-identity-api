@@ -2,7 +2,11 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { PURPOSE } from '~/src/constants.js'
-import { auditRegistration, auditSignIn } from '~/src/lib/audit.js'
+import {
+  auditOtpIssued,
+  auditRegistration,
+  auditSignIn
+} from '~/src/lib/audit.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
@@ -31,6 +35,7 @@ jest.mock('~/src/lib/notify.js', () => ({
   sendEmail: jest.fn()
 }))
 jest.mock('~/src/lib/audit.js', () => ({
+  auditOtpIssued: jest.fn(),
   auditSignIn: jest.fn(),
   auditRegistration: jest.fn()
 }))
@@ -152,6 +157,35 @@ describe('signin service', () => {
 
       expect(sawLeadingZero).toBe(true)
     })
+
+    it('audits the issue against the interaction and the normalised address', async () => {
+      build()
+
+      await requestOtp('uid-1', 'A@B.com')
+
+      expect(auditOtpIssued).toHaveBeenCalledWith('uid-1', 'a@b.com')
+    })
+
+    it('audits every resend, so the trail counts the codes sent', async () => {
+      build()
+
+      await requestOtp('uid-1', 'a@b.com')
+      await requestOtp('uid-1', 'a@b.com')
+
+      expect(auditOtpIssued).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not audit an issue when the code could not be sent', async () => {
+      // the record means a code reached the address: a Notify failure is not
+      // an issued code, and the caller sees the error
+      build()
+      jest.mocked(sendEmail).mockRejectedValue(new Error('Notify is down'))
+
+      await expect(requestOtp('uid-1', 'a@b.com')).rejects.toThrow(
+        'Notify is down'
+      )
+      expect(auditOtpIssued).not.toHaveBeenCalled()
+    })
   })
 
   describe('verifyOtp', () => {
@@ -190,8 +224,24 @@ describe('signin service', () => {
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-1' })
       expect(docs[0].consumed).toBe(true)
       expect(auditSignIn).toHaveBeenCalledTimes(1)
-      expect(auditSignIn).toHaveBeenCalledWith('acc-1', 'a@b.com')
+      expect(auditSignIn).toHaveBeenCalledWith('acc-1', 'a@b.com', 'uid-1')
       expect(auditRegistration).not.toHaveBeenCalled()
+    })
+
+    it('audits the sign in against the interaction it happened on', async () => {
+      // the uid ties the sign in back to the OtpIssued record for the code
+      // that granted it, so it has to be the interaction, not a fixed value
+      build()
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(
+          /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
+        )
+      const code = await request('uid-other')
+
+      await verifyOtp('uid-other', code)
+
+      expect(auditSignIn).toHaveBeenCalledWith('acc-1', 'a@b.com', 'uid-other')
     })
 
     it('does not audit a sign in when the record is consumed by a concurrent request', async () => {
@@ -357,7 +407,7 @@ describe('signin service', () => {
         '+447911123456'
       )
       expect(auditSignIn).toHaveBeenCalledTimes(1)
-      expect(auditSignIn).toHaveBeenCalledWith(accountId, 'a@b.com')
+      expect(auditSignIn).toHaveBeenCalledWith(accountId, 'a@b.com', 'uid-1')
     })
 
     it('audits the existing account when the email already has one (duplicate race)', async () => {
@@ -379,7 +429,11 @@ describe('signin service', () => {
         'a@b.com',
         undefined
       )
-      expect(auditSignIn).toHaveBeenCalledWith('acc-existing', 'a@b.com')
+      expect(auditSignIn).toHaveBeenCalledWith(
+        'acc-existing',
+        'a@b.com',
+        'uid-1'
+      )
     })
 
     it('rejects an invalid phone without consuming the record', async () => {

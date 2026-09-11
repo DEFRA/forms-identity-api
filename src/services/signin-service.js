@@ -5,7 +5,11 @@ import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
 import { PURPOSE, STATUS } from '~/src/constants.js'
-import { auditRegistration, auditSignIn } from '~/src/lib/audit.js'
+import {
+  auditOtpIssued,
+  auditRegistration,
+  auditSignIn
+} from '~/src/lib/audit.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import { codeSchema, generateCode } from '~/src/otp-code.js'
@@ -46,6 +50,8 @@ export async function requestOtp(uid, email) {
   )
 
   await sendOtpEmail(target, code)
+
+  auditOtpIssued(uid, target)
 }
 
 /**
@@ -121,7 +127,7 @@ export async function verifyOtp(uid, code) {
       return failResult // concurrently spent or superseded by a resend
     }
 
-    auditSignIn(account._id, account.email)
+    auditSignIn(account._id, account.email, uid)
 
     return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
@@ -213,7 +219,7 @@ export async function completeSignup(uid, phone) {
   }
 
   auditRegistration(account._id, account.email, account.phone)
-  auditSignIn(account._id, account.email)
+  auditSignIn(account._id, account.email, uid)
 
   return { status: STATUS.SIGNED_IN, accountId: account._id }
 }
