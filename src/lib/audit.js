@@ -7,6 +7,7 @@ import { audit } from '@defra/cdp-auditing'
  */
 export const AUDIT_EVENT = {
   SIGN_IN: 'SignIn',
+  SIGN_OUT: 'SignOut',
   REGISTRATION: 'Registration'
 }
 
@@ -32,6 +33,15 @@ function auditEvent(event, accountId, email, fields = {}) {
  */
 export function auditSignIn(accountId, email) {
   auditEvent(AUDIT_EVENT.SIGN_IN, accountId, email)
+}
+
+/**
+ * A user's session ended (signed out)
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} email
+ */
+export function auditSignOut(accountId, email) {
+  auditEvent(AUDIT_EVENT.SIGN_OUT, accountId, email)
 }
 
 /**
