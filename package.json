@@ -61,7 +61,7 @@
     "@babel/plugin-syntax-import-attributes": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
     "@types/convict": "^6.1.6",
-    "@types/google-libphonenumber": "^7.4.30",
+    "@types/google-libphonenumber": "^7.4.31",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.1",
     "babel-jest": "^30.4.1",
