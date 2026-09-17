@@ -10,8 +10,8 @@ import {
  * Wire-level model names (snake_cased collection names). The routes validate
  * against this allowlist so the API never touches arbitrary collections.
  * Deliberately limited to the models our provider configuration can
- * produce — extend it when enabling a provider feature (refresh tokens,
- * device flow, CIBA, PAR); a missing model fails loudly as a 400 on the
+ * produce — extend it when enabling a provider feature (device flow, CIBA,
+ * PAR); a missing model fails loudly as a 400 on the
  * feature's first use.
  */
 export const MODEL_COLLECTIONS = OIDC_COLLECTION_NAMES

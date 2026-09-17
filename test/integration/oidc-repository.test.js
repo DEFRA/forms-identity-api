@@ -86,18 +86,45 @@ describe('oidc store', () => {
     await expect(stored('session', 'id-6')).resolves.toBeNull()
   })
 
+  it('stores, consumes and destroys refresh tokens', async () => {
+    // the provider marks a refresh token consumed when it replaces it, and
+    // reads it back to refuse (and revoke the grant on) a second use
+    await upsert('refresh_token', 'r-1', { grantId: 'g-1', kind: 'x' }, 60)
+
+    await expect(find('refresh_token', 'r-1')).resolves.toEqual({
+      grantId: 'g-1',
+      kind: 'x'
+    })
+
+    await consume('refresh_token', 'r-1')
+
+    await expect(find('refresh_token', 'r-1')).resolves.toEqual({
+      grantId: 'g-1',
+      kind: 'x',
+      consumed: expect.any(Number)
+    })
+
+    await destroy('refresh_token', 'r-1')
+
+    await expect(stored('refresh_token', 'r-1')).resolves.toBeNull()
+  })
+
   it('revokeByGrantId sweeps only grantable artifacts of that grant', async () => {
     await upsert('access_token', 't-1', { grantId: 'g-1' }, 60)
     await upsert('authorization_code', 'c-1', { grantId: 'g-1' }, 60)
+    await upsert('refresh_token', 'r-1', { grantId: 'g-1' }, 60)
     await upsert('access_token', 't-2', { grantId: 'g-2' }, 60)
+    await upsert('refresh_token', 'r-2', { grantId: 'g-2' }, 60)
     await upsert('session', 's-1', { grantId: 'g-1' }, 60)
 
     await revokeByGrantId('g-1')
 
     await expect(stored('access_token', 't-1')).resolves.toBeNull()
     await expect(stored('authorization_code', 'c-1')).resolves.toBeNull()
+    await expect(stored('refresh_token', 'r-1')).resolves.toBeNull()
     // other grants and non-grantable models are untouched
     await expect(stored('access_token', 't-2')).resolves.not.toBeNull()
+    await expect(stored('refresh_token', 'r-2')).resolves.not.toBeNull()
     await expect(stored('session', 's-1')).resolves.not.toBeNull()
   })
 })

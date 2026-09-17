@@ -61,6 +61,40 @@ describe('oidc store routes', () => {
     )
   })
 
+  it('accepts refresh_token on every model route', async () => {
+    // the provider stores, reads, consumes (on rotation) and deletes refresh
+    // tokens through these routes
+    jest.mocked(find).mockResolvedValue({ grantId: 'g-1' })
+    jest.mocked(destroy).mockResolvedValue({ grantId: 'g-1' })
+    const server = await buildServer()
+
+    const attempts = [
+      {
+        method: 'PUT',
+        url: '/oidc/refresh_token/r-1',
+        payload: { payload: { grantId: 'g-1' }, expiresIn: 60 }
+      },
+      { method: 'GET', url: '/oidc/refresh_token/r-1' },
+      { method: 'POST', url: '/oidc/refresh_token/r-1/consume' },
+      { method: 'DELETE', url: '/oidc/refresh_token/r-1' }
+    ]
+
+    for (const attempt of attempts) {
+      const res = await server.inject(attempt)
+      expect(res.statusCode).toBeLessThan(300)
+    }
+    expect(upsert).toHaveBeenCalledWith(
+      'refresh_token',
+      'r-1',
+      { grantId: 'g-1' },
+      60
+    )
+    expect(find).toHaveBeenCalledWith('refresh_token', 'r-1')
+    expect(consume).toHaveBeenCalledWith('refresh_token', 'r-1')
+    expect(destroy).toHaveBeenCalledWith('refresh_token', 'r-1')
+    expect(auditSignOut).not.toHaveBeenCalled()
+  })
+
   it('rejects models outside the allowlist with 400 on every route', async () => {
     // The allowlist is what stops these routes reading or writing arbitrary
     // collections — `accounts` is exactly the collection they must never reach
