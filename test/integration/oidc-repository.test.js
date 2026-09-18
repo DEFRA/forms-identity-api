@@ -35,27 +35,21 @@ describe('oidc store', () => {
     expect(doc?.expireAt.getTime()).toBeGreaterThan(Date.now())
   })
 
-  it('find returns exactly the payload, and throws notFound when missing', async () => {
+  it('find returns exactly the payload, and null when missing', async () => {
     await upsert('grant', 'id-2', { a: 1 }, 60)
 
     await expect(find('grant', 'id-2')).resolves.toEqual({ a: 1 })
-    await expect(find('grant', 'missing')).rejects.toMatchObject({
-      isBoom: true,
-      output: { statusCode: 404 }
-    })
+    await expect(find('grant', 'missing')).resolves.toBeNull()
   })
 
-  it('findByUid resolves sessions by the nested uid, throws notFound otherwise', async () => {
+  it('findByUid resolves sessions by the nested uid, null otherwise', async () => {
     await upsert('session', 'id-3', { uid: 'u-9', b: 2 }, 60)
 
     await expect(findByUid('session', 'u-9')).resolves.toEqual({
       uid: 'u-9',
       b: 2
     })
-    await expect(findByUid('session', 'nope')).rejects.toMatchObject({
-      isBoom: true,
-      output: { statusCode: 404 }
-    })
+    await expect(findByUid('session', 'nope')).resolves.toBeNull()
   })
 
   it('a re-upsert without expiresIn clears a previously set expiry', async () => {

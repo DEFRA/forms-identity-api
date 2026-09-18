@@ -131,8 +131,7 @@ describe('oidc store routes', () => {
     expect(upsert).toHaveBeenCalledWith('session', 'id-1', { uid: 'u-1' }, 60)
   })
 
-  it('GET returns the payload, and 404 when the repository throws notFound', async () => {
-    const Boom = jest.requireActual('@hapi/boom')
+  it('GET returns the payload, and an empty 204 when the artifact is absent', async () => {
     jest.mocked(find).mockResolvedValue({ a: 1 })
     const server = await buildServer()
 
@@ -143,12 +142,28 @@ describe('oidc store routes', () => {
     expect(found.statusCode).toBe(200)
     expect(JSON.parse(found.payload)).toEqual({ a: 1 })
 
-    jest.mocked(find).mockRejectedValue(Boom.notFound())
+    // a miss is the provider probing the store, not a failure, so it must
+    // stay off the error path rather than answering 404
+    jest.mocked(find).mockResolvedValue(null)
     const missing = await server.inject({
       method: 'GET',
       url: '/oidc/grant/missing'
     })
-    expect(missing.statusCode).toBe(404)
+    expect(missing.statusCode).toBe(204)
+    expect(missing.payload).toBe('')
+  })
+
+  it('GET by uid answers 204 when no artifact has that uid', async () => {
+    jest.mocked(findByUid).mockResolvedValue(null)
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'GET',
+      url: '/oidc/session/uid/nope'
+    })
+
+    expect(res.statusCode).toBe(204)
+    expect(res.payload).toBe('')
   })
 
   it('GET by uid resolves sessions', async () => {
