@@ -9,6 +9,7 @@ export const AUDIT_EVENT = {
   OTP_ISSUED: 'OtpIssued',
   OTP_LOCKED_OUT: 'OtpLockedOut',
   SIGN_IN: 'SignIn',
+  SIGN_OUT: 'SignOut',
   REGISTRATION: 'Registration'
 }
 
@@ -75,6 +76,15 @@ export function auditOtpLockout(uid, email, lockedUntil) {
  */
 export function auditSignIn(accountId, email, uid) {
   auditAccountEvent(AUDIT_EVENT.SIGN_IN, accountId, email, { uid })
+}
+
+/**
+ * A user's session ended (signed out)
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} email
+ */
+export function auditSignOut(accountId, email) {
+  auditAccountEvent(AUDIT_EVENT.SIGN_OUT, accountId, email)
 }
 
 /**
