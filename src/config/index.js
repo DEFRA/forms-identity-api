@@ -153,6 +153,13 @@ export const config = convict({
         format: String,
         default: /** @type {string | null} */ (null),
         env: 'NOTIFY_REPLY_TO_ID'
+      },
+      /** @type {SchemaObj<string>} */
+      smsTemplateId: {
+        doc: 'GOV.UK Notify SMS template id for the security-code text message (must contain ((code)) and ((expiry_minutes)))',
+        format: String,
+        default: '',
+        env: 'NOTIFY_OTP_SMS_TEMPLATE_ID'
       }
     }
   },

@@ -53,7 +53,7 @@ describe('one-time-code lifecycle', () => {
     const failed = await inject({
       method: 'POST',
       url: '/otp/request',
-      payload: { uid: 'uid-outage', email: 'citizen@example.com' }
+      payload: { uid: 'uid-outage', target: 'citizen@example.com' }
     })
     expect(failed.statusCode).toBe(500)
 
