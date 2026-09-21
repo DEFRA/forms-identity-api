@@ -4,7 +4,8 @@ import { audit } from '@defra/cdp-auditing'
 import {
   auditOtpIssued,
   auditRegistration,
-  auditSignIn
+  auditSignIn,
+  auditSignOut
 } from '~/src/lib/audit.js'
 
 jest.mock('@defra/cdp-auditing', () => ({
@@ -32,6 +33,17 @@ describe('audit events', () => {
       accountId: 'acc-1',
       email: 'citizen@example.com',
       uid: 'uid-1'
+    })
+  })
+
+  it('records a SignOut event with the account id and email', () => {
+    auditSignOut('acc-1', 'citizen@example.com')
+
+    expect(audit).toHaveBeenCalledTimes(1)
+    expect(audit).toHaveBeenCalledWith({
+      event: 'SignOut',
+      accountId: 'acc-1',
+      email: 'citizen@example.com'
     })
   })
 

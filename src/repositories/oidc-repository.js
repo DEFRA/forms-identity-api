@@ -92,11 +92,19 @@ export async function consume(model, id) {
 }
 
 /**
+ * Deletes the artifact and hands back the payload it held, so a caller that
+ * needs to know what was destroyed (e.g. to audit a session ending) doesn't
+ * have to read it back first.
  * @param {string} model
  * @param {string} id
+ * @returns {Promise<Record<string, unknown> | null>}
  */
 export async function destroy(model, id) {
-  await db.collection(model).deleteOne({ _id: /** @type {never} */ (id) })
+  const doc = await db
+    .collection(model)
+    .findOneAndDelete({ _id: /** @type {never} */ (id) })
+
+  return doc?.payload ?? null
 }
 
 /**
