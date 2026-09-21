@@ -46,7 +46,7 @@ describe('OTP endpoints', () => {
 
       expect(res.statusCode).toBe(204)
       expect(sendSms).toHaveBeenCalledWith(
-        'efd635d3-9ef5-4369-9c82-6aae5aed55bf',
+        'ssssssss-ssss-ssss-ssss-ssssssssssss',
         '+447507123456',
         { code: expect.any(String), expiry_minutes: 15 }
       )
