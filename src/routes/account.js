@@ -1,3 +1,4 @@
+import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { updateEmail } from '~/src/services/account-service.js'
@@ -37,12 +38,13 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
-    handler(request) {
+    async handler(request, h) {
       const { uid, id } = /** @type {{ uid: string, id: string }} */ (
         request.params
       )
       const { email } = /** @type {{ email: string }} */ (request.payload)
-      return updateEmail(uid, id, email)
+      await updateEmail(uid, id, email)
+      return h.response().code(StatusCodes.OK)
     }
   }
 ])

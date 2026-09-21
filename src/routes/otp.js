@@ -86,10 +86,10 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
-    async handler(request) {
+    handler(request) {
       const { uid, purpose } =
         /** @type {{ uid: string, purpose: PurposeType }} */ (request.params)
-      return await findOtp(uid, purpose)
+      return findOtp(uid, purpose)
     }
   },
   {

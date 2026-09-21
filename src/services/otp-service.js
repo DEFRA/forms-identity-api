@@ -157,9 +157,9 @@ export async function verifyOtp(uid, code, purpose) {
     }
 
     // PURPOSE.ACCOUNT_VERIFY_EMAIL or PURPOSE.ACCOUNT_VERIFY_PHONE
-    const verified = await otpsRepository.update(claim, { verified: true })
+    const verifiedOtp = await otpsRepository.update(claim, { verified: true })
 
-    if (!verified) {
+    if (!verifiedOtp) {
       return failResult
     }
 

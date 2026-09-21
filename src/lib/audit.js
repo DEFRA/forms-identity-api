@@ -6,6 +6,7 @@ import { audit } from '@defra/cdp-auditing'
  * record, so downstream consumers can filter on it.
  */
 export const AUDIT_EVENT = {
+  EMAIL_CHANGED: 'EmailChanged',
   SIGN_IN: 'SignIn',
   SIGN_OUT: 'SignOut',
   REGISTRATION: 'Registration'
@@ -24,6 +25,16 @@ export const AUDIT_EVENT = {
  */
 function auditEvent(event, accountId, email, fields = {}) {
   audit({ event, accountId, email, ...fields })
+}
+
+/**
+ * A user authenticated and is signed in
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} email
+ * @param {string} newEmail
+ */
+export function auditEmailChanged(accountId, email, newEmail) {
+  auditEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, email, { newEmail })
 }
 
 /**
