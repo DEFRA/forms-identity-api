@@ -34,6 +34,12 @@ const modelIdParams = Joi.object({
  * service auth is a later addition); model names are validated against the
  * store's allowlist so they can never read or write arbitrary collections
  * (e.g. accounts).
+ *
+ * A read of an artifact that isn't stored answers 204, not 404. The provider
+ * probes the store on every token request, so a miss is the routine answer
+ * rather than a fault, and a 4xx would have logging, error-rate metrics and
+ * alerting all treat the hot path as failing. Reads therefore never 4xx here:
+ * an unknown model name is rejected as a 400 by the params validation above.
  * @type {ServerRoute[]}
  */
 export default [
@@ -62,9 +68,15 @@ export default [
     path: MODEL_ID_PATH,
     options: { validate: { params: modelIdParams } },
     /** @param {ModelIdRequest} request */
-    handler(request) {
+    async handler(request, h) {
       const { model, id } = request.params
-      return find(model, id)
+      const payload = await find(model, id)
+
+      if (!payload) {
+        return h.response().code(StatusCodes.NO_CONTENT)
+      }
+
+      return payload
     }
   },
   {
@@ -76,9 +88,15 @@ export default [
       }
     },
     /** @param {ModelUidRequest} request */
-    handler(request) {
+    async handler(request, h) {
       const { model, uid } = request.params
-      return findByUid(model, uid)
+      const payload = await findByUid(model, uid)
+
+      if (!payload) {
+        return h.response().code(StatusCodes.NO_CONTENT)
+      }
+
+      return payload
     }
   },
   {
