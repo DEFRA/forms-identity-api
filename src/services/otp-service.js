@@ -15,6 +15,10 @@ const OTP_EXPIRY_MINUTES = Math.round(OTP_TTL_SECONDS / 60)
 const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
 const OTP_NOTIFY_SMS_TEMPLATE_ID = config.get('otp.notify.smsTemplateId')
 
+/**
+ * @typedef {{ codeHash: string, uid: string, purpose: PurposeType, verified: boolean, consumed: boolean, accountId?: string }} ClaimType
+ */
+
 // Every OTP operation filters on {uid, purpose} — never uid alone — so codes
 // are isolated per interaction and per purpose.
 
@@ -169,25 +173,7 @@ export async function verifyOtp(uid, code, purpose, id) {
     : await accountsRepository.findByEmail(doc.target)
 
   if (account) {
-    if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL) {
-      const consumed = await otpsRepository.update(claim, { consumed: true })
-
-      if (!consumed) {
-        return failResult // concurrently spent or superseded by a resend
-      }
-
-      auditSignIn(account._id, account.email, uid)
-      return { status: STATUS.SIGNED_IN, accountId: account._id }
-    }
-
-    // PURPOSE.ACCOUNT_VERIFY_EMAIL or PURPOSE.ACCOUNT_VERIFY_PHONE
-    const verifiedOtp = await otpsRepository.update(claim, { verified: true })
-
-    if (!verifiedOtp) {
-      return failResult
-    }
-
-    return { status: STATUS.VALID }
+    return await handleWhenAccount(account, uid, purpose, claim, failResult)
   }
 
   const verified = await otpsRepository.update(claim, { verified: true })
@@ -197,6 +183,35 @@ export async function verifyOtp(uid, code, purpose, id) {
   }
 
   return { status: STATUS.PHONE_REQUIRED }
+}
+
+/**
+ * @param {WithId<accountsRepository.AccountDocument>} account
+ * @param {string} uid
+ * @param {PurposeType} purpose
+ * @param {ClaimType} claim
+ * @param {VerifyResult} failResult
+ */
+async function handleWhenAccount(account, uid, purpose, claim, failResult) {
+  if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL) {
+    const consumed = await otpsRepository.update(claim, { consumed: true })
+
+    if (!consumed) {
+      return failResult // concurrently spent or superseded by a resend
+    }
+
+    auditSignIn(account._id, account.email, uid)
+    return { status: STATUS.SIGNED_IN, accountId: account._id }
+  }
+
+  // PURPOSE.ACCOUNT_VERIFY_EMAIL or PURPOSE.ACCOUNT_VERIFY_PHONE
+  const verifiedOtp = await otpsRepository.update(claim, { verified: true })
+
+  if (!verifiedOtp) {
+    return failResult
+  }
+
+  return { status: STATUS.VALID }
 }
 
 /**
@@ -279,9 +294,9 @@ export async function removeOtps(uid) {
 }
 
 /**
- * @import { Filter } from 'mongodb'
+ * @import { Filter, WithId } from 'mongodb'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
- * @import {PurposeType} from '~/src/constants.js'
+ * @import { PurposeType } from '~/src/constants.js'
  * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string } | { status: 'valid' }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */
