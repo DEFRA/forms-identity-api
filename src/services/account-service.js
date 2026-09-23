@@ -46,7 +46,7 @@ export async function updateEmail(uid, id) {
     return { status: STATUS.INVALID } // a concurrent submit already completed
   }
 
-  auditEmailChanged(account._id, account.email, newEmail)
+  auditEmailChanged(account._id, newEmail)
 
   return { status: STATUS.VALID }
 }

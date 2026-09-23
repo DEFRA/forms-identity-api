@@ -3,7 +3,7 @@ import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
 import { PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
-import { auditSignIn } from '~/src/lib/audit.js'
+import { auditOtpIssued, auditSignIn } from '~/src/lib/audit.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
@@ -31,8 +31,8 @@ const OTP_NOTIFY_SMS_TEMPLATE_ID = config.get('otp.notify.smsTemplateId')
 export async function requestOtp(
   uid,
   email,
-  transportType,
-  purpose,
+  transportType = TRANSPORT.EMAIL,
+  purpose = PURPOSE.SIGNIN_VERIFY_EMAIL,
   accountId
 ) {
   let target = email?.toLowerCase()
@@ -47,6 +47,10 @@ export async function requestOtp(
       // Get phone from account - ignore anything passed in
       target = account.phone
     }
+  }
+
+  if (!target) {
+    throw Boom.badRequest()
   }
 
   const code = generateCode()
@@ -67,10 +71,12 @@ export async function requestOtp(
   )
 
   if (transportType === TRANSPORT.EMAIL) {
-    await sendOtpEmail(/** @type {string} */ (target), code)
+    await sendOtpEmail(target, code)
   } else {
-    await sendOtpSms(/** @type {string} */ (target), code)
+    await sendOtpSms(target, code)
   }
+
+  auditOtpIssued(uid, target)
 }
 
 /**
@@ -170,7 +176,7 @@ export async function verifyOtp(uid, code, purpose, id) {
         return failResult // concurrently spent or superseded by a resend
       }
 
-      auditSignIn(account._id, account.email)
+      auditSignIn(account._id, account.email, uid)
       return { status: STATUS.SIGNED_IN, accountId: account._id }
     }
 

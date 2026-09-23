@@ -2,6 +2,7 @@
 import { audit } from '@defra/cdp-auditing'
 
 import {
+  auditOtpIssued,
   auditRegistration,
   auditSignIn,
   auditSignOut
@@ -12,14 +13,26 @@ jest.mock('@defra/cdp-auditing', () => ({
 }))
 
 describe('audit events', () => {
-  it('records a SignIn event with the account id and email', () => {
-    auditSignIn('acc-1', 'citizen@example.com')
+  it('records an OtpIssued event with the interaction id and email', () => {
+    auditOtpIssued('uid-1', 'citizen@example.com')
+
+    expect(audit).toHaveBeenCalledTimes(1)
+    expect(audit).toHaveBeenCalledWith({
+      event: 'OtpIssued',
+      email: 'citizen@example.com',
+      uid: 'uid-1'
+    })
+  })
+
+  it('records a SignIn event with the account id, email and interaction', () => {
+    auditSignIn('acc-1', 'citizen@example.com', 'uid-1')
 
     expect(audit).toHaveBeenCalledTimes(1)
     expect(audit).toHaveBeenCalledWith({
       event: 'SignIn',
       accountId: 'acc-1',
-      email: 'citizen@example.com'
+      email: 'citizen@example.com',
+      uid: 'uid-1'
     })
   })
 

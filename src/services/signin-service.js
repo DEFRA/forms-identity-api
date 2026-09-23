@@ -8,9 +8,6 @@ import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
-// Every OTP operation filters on {uid, purpose} — never uid alone — so codes
-// are isolated per interaction and per purpose.
-
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
  * for this uid. Account creation precedes consumption so a crash between
@@ -50,7 +47,7 @@ export async function completeSignup(uid, phone) {
   }
 
   auditRegistration(account._id, account.email, account.phone)
-  auditSignIn(account._id, account.email)
+  auditSignIn(account._id, account.email, uid)
 
   return { status: STATUS.SIGNED_IN, accountId: account._id }
 }
