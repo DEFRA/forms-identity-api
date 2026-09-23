@@ -55,14 +55,14 @@ export async function clear(filter) {
  * @returns {Promise<OtpLockoutDocument>}
  */
 export async function incrementRequests(key, fields, onInsert) {
-  const update = {
+  const updateRequest = {
     $inc: { requests: 1 },
     $set: fields,
     $setOnInsert: { ...onInsert, createdAt: new Date() }
   }
 
   try {
-    const doc = await coll().findOneAndUpdate(key, update, {
+    const doc = await coll().findOneAndUpdate(key, updateRequest, {
       upsert: true,
       returnDocument: 'after'
     })
@@ -78,7 +78,7 @@ export async function incrementRequests(key, fields, onInsert) {
     // insert path, and the unique index rejects the loser. The winner's
     // counter now exists, so the same call is an increment second time
     // round: retry once rather than fail a request that should be counted.
-    const doc = await coll().findOneAndUpdate(key, update, {
+    const doc = await coll().findOneAndUpdate(key, updateRequest, {
       returnDocument: 'after'
     })
 
