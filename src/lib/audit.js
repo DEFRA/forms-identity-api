@@ -22,9 +22,9 @@ export const AUDIT_EVENT = {
  * Anything that acts on an account goes through auditAccountEvent.
  * @param {string} event
  * @param {string} email
- * @param {Record<string, string>} [fields]
+ * @param {Record<string, string>} fields
  */
-function auditEvent(event, email, fields = {}) {
+function auditEvent(event, email, fields) {
   audit({ event, email, ...fields })
 }
 
