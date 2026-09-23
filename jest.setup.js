@@ -23,3 +23,9 @@ process.env.NOTIFY_OTP_TEMPLATE_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
 process.env.NOTIFY_REPLY_TO_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-replytozzzzz'
 
 process.env.TRACING_HEADER = 'x-cdp-request-id'
+
+// Pinned to the config defaults so a developer's local .env (which dotenv
+// loads but will not override) cannot change the limits the tests assert on
+process.env.OTP_LOCKOUT_MAX_REQUESTS = '5'
+process.env.OTP_LOCKOUT_WINDOW_SECONDS = '7200'
+process.env.OTP_LOCKOUT_DURATION_SECONDS = '7200'

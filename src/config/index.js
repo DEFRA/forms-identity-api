@@ -131,6 +131,29 @@ export const config = convict({
       default: 5,
       env: 'OTP_MAX_ATTEMPTS'
     },
+    lockout: {
+      /** @type {SchemaObj<number>} */
+      maxRequests: {
+        doc: 'Codes an email address may request within one window before it is locked out. The request that goes past this number is refused, so with the default the sixth request in a window is the one that locks the address.',
+        format: Number,
+        default: 5,
+        env: 'OTP_LOCKOUT_MAX_REQUESTS'
+      },
+      /** @type {SchemaObj<number>} */
+      windowSeconds: {
+        doc: 'How long the request count for an email address is kept before it starts again',
+        format: Number,
+        default: 7200,
+        env: 'OTP_LOCKOUT_WINDOW_SECONDS'
+      },
+      /** @type {SchemaObj<number>} */
+      durationSeconds: {
+        doc: 'How long an email address stays locked out once it has gone past the request limit',
+        format: Number,
+        default: 7200,
+        env: 'OTP_LOCKOUT_DURATION_SECONDS'
+      }
+    },
     notify: {
       /** @type {SchemaObj<string>} */
       apiKey: {

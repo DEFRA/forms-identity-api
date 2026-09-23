@@ -5,6 +5,7 @@ import { sendEmail } from '~/src/lib/notify.js'
 import {
   ACCOUNTS_COLLECTION_NAME,
   OTPS_COLLECTION_NAME,
+  OTP_LOCKOUTS_COLLECTION_NAME,
   client,
   db
 } from '~/src/mongo.js'
@@ -49,9 +50,11 @@ export function setupSigninFlow() {
 
   afterEach(() =>
     Promise.all(
-      [ACCOUNTS_COLLECTION_NAME, OTPS_COLLECTION_NAME].map((name) =>
-        db.collection(name).deleteMany({})
-      )
+      [
+        ACCOUNTS_COLLECTION_NAME,
+        OTPS_COLLECTION_NAME,
+        OTP_LOCKOUTS_COLLECTION_NAME
+      ].map((name) => db.collection(name).deleteMany({}))
     )
   )
 
@@ -88,13 +91,24 @@ export function setupSigninFlow() {
    * @param {string} uid
    */
   async function requestCode(uid, email = 'citizen@example.com') {
-    const res = await inject({
+    const res = await requestCodeResponse(uid, email)
+    expect(res.statusCode).toBe(StatusCodes.OK)
+    expect(JSON.parse(res.payload)).toEqual({ status: 'otp-issued' })
+    return lastSentCode()
+  }
+
+  /**
+   * Requests a sign-in code over HTTP and hands back the raw response, for
+   * tests about requests that are refused rather than issued
+   * @param {string} uid
+   * @param {string} [email]
+   */
+  function requestCodeResponse(uid, email = 'citizen@example.com') {
+    return inject({
       method: 'POST',
       url: '/otp/request',
       payload: { uid, email }
     })
-    expect(res.statusCode).toBe(StatusCodes.NO_CONTENT)
-    return lastSentCode()
   }
 
   /**
@@ -113,5 +127,12 @@ export function setupSigninFlow() {
     return JSON.parse(res.payload)
   }
 
-  return { inject, injectWithoutToken, requestCode, verify, lastSentCode }
+  return {
+    inject,
+    injectWithoutToken,
+    requestCode,
+    requestCodeResponse,
+    verify,
+    lastSentCode
+  }
 }

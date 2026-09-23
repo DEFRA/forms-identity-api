@@ -3,6 +3,7 @@ import { audit } from '@defra/cdp-auditing'
 
 import {
   auditOtpIssued,
+  auditOtpLockout,
   auditRegistration,
   auditSignIn,
   auditSignOut
@@ -21,6 +22,22 @@ describe('audit events', () => {
       event: 'OtpIssued',
       email: 'citizen@example.com',
       uid: 'uid-1'
+    })
+  })
+
+  it('records an OtpLockedOut event with the unlock time as an ISO string', () => {
+    auditOtpLockout(
+      'uid-1',
+      'citizen@example.com',
+      new Date('2026-09-11T12:00:00.000Z')
+    )
+
+    expect(audit).toHaveBeenCalledTimes(1)
+    expect(audit).toHaveBeenCalledWith({
+      event: 'OtpLockedOut',
+      email: 'citizen@example.com',
+      uid: 'uid-1',
+      lockedUntil: '2026-09-11T12:00:00.000Z'
     })
   })
 

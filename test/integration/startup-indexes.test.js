@@ -3,6 +3,7 @@ import {
   GRANTABLE_COLLECTION_NAMES,
   OIDC_COLLECTION_NAMES,
   OTPS_COLLECTION_NAME,
+  OTP_LOCKOUTS_COLLECTION_NAME,
   db
 } from '~/src/mongo.js'
 import { setupIntegrationDb } from '~/test/helpers/mongo-memory.js'
@@ -25,16 +26,23 @@ describe('startup indexes', () => {
     )
   })
 
+  it('keeps one request counter per address', async () => {
+    expect(await indexesOf(OTP_LOCKOUTS_COLLECTION_NAME)).toContainEqual(
+      expect.objectContaining({ key: { target: 1 }, unique: true })
+    )
+  })
+
   // iterating the lists rather than a sample: a model added to one of them
   // without its index fails here rather than accumulating records forever
-  it.each([OTPS_COLLECTION_NAME, ...OIDC_COLLECTION_NAMES])(
-    'gives %s a TTL sweeper',
-    async (name) => {
-      expect(await indexesOf(name)).toContainEqual(
-        expect.objectContaining({ key: { expireAt: 1 }, expireAfterSeconds: 0 })
-      )
-    }
-  )
+  it.each([
+    OTPS_COLLECTION_NAME,
+    OTP_LOCKOUTS_COLLECTION_NAME,
+    ...OIDC_COLLECTION_NAMES
+  ])('gives %s a TTL sweeper', async (name) => {
+    expect(await indexesOf(name)).toContainEqual(
+      expect.objectContaining({ key: { expireAt: 1 }, expireAfterSeconds: 0 })
+    )
+  })
 
   it.each(GRANTABLE_COLLECTION_NAMES)(
     'indexes %s by the grant it was issued under',
