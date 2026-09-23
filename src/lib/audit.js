@@ -52,7 +52,7 @@ export function auditOtpIssued(uid, email) {
 }
 
 /**
- * A user authenticated and is signed in
+ * A user changed their email address (on their logged-in account)
  * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
  * @param {string} email - the new email address
  */
