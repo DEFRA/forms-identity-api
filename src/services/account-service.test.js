@@ -28,9 +28,9 @@ describe('account service', () => {
     // @ts-expect-error - partial mock of test data
     jest.mocked(findById).mockResolvedValueOnce({ status: 'active' })
     jest.mocked(update).mockResolvedValueOnce(true)
-    // @ts-expect-error - partial mock of test data
     jest
       .mocked(findOne)
+      // @ts-expect-error - partial mock of test data
       .mockResolvedValueOnce({
         consumed: false,
         verified: true,

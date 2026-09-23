@@ -169,7 +169,12 @@ describe('signin service', () => {
     it('audits the issue against the interaction and the normalised address', async () => {
       build()
 
-      await requestOtp('uid-1', 'A@B.com')
+      await requestOtp(
+        'uid-1',
+        'A@B.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(auditOtpIssued).toHaveBeenCalledWith('uid-1', 'a@b.com')
     })
@@ -177,8 +182,18 @@ describe('signin service', () => {
     it('audits every resend, so the trail counts the codes sent', async () => {
       build()
 
-      await requestOtp('uid-1', 'a@b.com')
-      await requestOtp('uid-1', 'a@b.com')
+      await requestOtp(
+        'uid-1',
+        'a@b.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
+      await requestOtp(
+        'uid-1',
+        'a@b.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(auditOtpIssued).toHaveBeenCalledTimes(2)
     })
@@ -189,9 +204,14 @@ describe('signin service', () => {
       build()
       jest.mocked(sendEmail).mockRejectedValue(new Error('Notify is down'))
 
-      await expect(requestOtp('uid-1', 'a@b.com')).rejects.toThrow(
-        'Notify is down'
-      )
+      await expect(
+        requestOtp(
+          'uid-1',
+          'a@b.com',
+          TRANSPORT.EMAIL,
+          PURPOSE.SIGNIN_VERIFY_EMAIL
+        )
+      ).rejects.toThrow('Notify is down')
       expect(auditOtpIssued).not.toHaveBeenCalled()
     })
   })

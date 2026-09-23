@@ -31,8 +31,8 @@ const OTP_NOTIFY_SMS_TEMPLATE_ID = config.get('otp.notify.smsTemplateId')
 export async function requestOtp(
   uid,
   email,
-  transportType = TRANSPORT.EMAIL,
-  purpose = PURPOSE.SIGNIN_VERIFY_EMAIL,
+  transportType,
+  purpose,
   accountId
 ) {
   let target = email?.toLowerCase()
