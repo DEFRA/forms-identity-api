@@ -1,5 +1,3 @@
-import Boom from '@hapi/boom'
-
 import {
   GRANTABLE_COLLECTION_NAMES,
   OIDC_COLLECTION_NAMES,
@@ -10,8 +8,8 @@ import {
  * Wire-level model names (snake_cased collection names). The routes validate
  * against this allowlist so the API never touches arbitrary collections.
  * Deliberately limited to the models our provider configuration can
- * produce — extend it when enabling a provider feature (refresh tokens,
- * device flow, CIBA, PAR); a missing model fails loudly as a 400 on the
+ * produce — extend it when enabling a provider feature (device flow, CIBA,
+ * PAR); a missing model fails loudly as a 400 on the
  * feature's first use.
  */
 export const MODEL_COLLECTIONS = OIDC_COLLECTION_NAMES
@@ -47,35 +45,33 @@ export async function upsert(model, id, payload, expiresIn) {
 }
 
 /**
+ * Returns null when the document does not exist, rather than throwing.
+ * oidc-provider routinely looks up records that may not exist (for example,
+ * checking for an existing session or whether an assertion has already been
+ * used), so a missing record is a normal outcome and the caller decides how
+ * to handle it. See the route for how null is returned in the HTTP response.
  * @param {string} model
  * @param {string} id
- * @throws {Boom.Boom} notFound when the artifact does not exist
+ * @returns {Promise<Record<string, unknown> | null>}
  */
 export async function find(model, id) {
   const doc = await db
     .collection(model)
     .findOne({ _id: /** @type {never} */ (id) })
 
-  if (!doc) {
-    throw Boom.notFound()
-  }
-
-  return doc.payload
+  return doc?.payload ?? null
 }
 
 /**
+ * Null when no artifact has that uid, for the same reason as `find`.
  * @param {string} model
  * @param {string} uid
- * @throws {Boom.Boom} notFound when no artifact has that uid
+ * @returns {Promise<Record<string, unknown> | null>}
  */
 export async function findByUid(model, uid) {
   const doc = await db.collection(model).findOne({ 'payload.uid': uid })
 
-  if (!doc) {
-    throw Boom.notFound()
-  }
-
-  return doc.payload
+  return doc?.payload ?? null
 }
 
 /**
