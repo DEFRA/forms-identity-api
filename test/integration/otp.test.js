@@ -1,7 +1,6 @@
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
-import { deleteMany } from '~/src/repositories/otps-repository.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({
@@ -56,18 +55,6 @@ describe('OTP endpoints', () => {
         { code: expect.any(String), expiry_minutes: 15 }
       )
       expect(sendEmail).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('remove OTP', () => {
-    it('deletes relevant OTP records', async () => {
-      const res = await inject({
-        method: 'DELETE',
-        url: '/otp/uid-1'
-      })
-
-      expect(res.statusCode).toBe(204)
-      expect(deleteMany).toHaveBeenCalledWith({ uid: 'uid-1' })
     })
   })
 })

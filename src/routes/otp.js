@@ -3,12 +3,7 @@ import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
-import {
-  findOtp,
-  removeOtps,
-  requestOtp,
-  verifyOtp
-} from '~/src/services/otp-service.js'
+import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
 const transportSchema = Joi.string()
   .valid(...Object.keys(TRANSPORT))
@@ -35,7 +30,7 @@ export default /** @type {ServerRoute[]} */ ([
           accountId: Joi.when('purpose', {
             is: PURPOSE.SIGNIN_VERIFY_EMAIL,
             then: Joi.forbidden(),
-            otherwise: Joi.string().allow('')
+            otherwise: Joi.string().required()
           }),
           target: Joi.when('transport', {
             is: TRANSPORT.EMAIL,
@@ -114,27 +109,10 @@ export default /** @type {ServerRoute[]} */ ([
         /** @type {{ uid: string, purpose: PurposeType }} */ (request.params)
       return findOtp(uid, purpose)
     }
-  },
-  {
-    method: 'DELETE',
-    path: '/otp/{uid}',
-    options: {
-      validate: {
-        params: Joi.object({
-          uid: Joi.string().required()
-        })
-      }
-    },
-    async handler(request, h) {
-      const uid = /** @type {string} */ (request.params.uid)
-      await removeOtps(uid)
-      return h.response().code(StatusCodes.NO_CONTENT)
-    }
   }
 ])
 
 /**
  * @import { ServerRoute } from '@hapi/hapi'
- * @import { TelephoneSchema } from '~/src/lib/telephone.js'
  * @import { PurposeType, TransportType } from '~/src/constants.js'
  */

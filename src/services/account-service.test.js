@@ -9,6 +9,7 @@ describe('account service', () => {
   const uid = 'uid-1'
   const id = 'acc-id'
   const email = 'new-email@test.com'
+  const phone = '+447507123456'
 
   it('should throw when account not found', async () => {
     jest.mocked(findById).mockResolvedValueOnce(null)
@@ -27,7 +28,7 @@ describe('account service', () => {
   it('should return valid when successful', async () => {
     // @ts-expect-error - partial mock of test data
     jest.mocked(findById).mockResolvedValueOnce({ status: 'active' })
-    jest.mocked(update).mockResolvedValueOnce(true)
+    jest.mocked(update).mockResolvedValueOnce(true).mockResolvedValueOnce(true)
     jest
       .mocked(findOne)
       // @ts-expect-error - partial mock of test data
@@ -36,6 +37,13 @@ describe('account service', () => {
         verified: true,
         accountId: id,
         target: email
+      })
+      // @ts-expect-error - partial mock of test data
+      .mockResolvedValueOnce({
+        consumed: false,
+        verified: true,
+        accountId: id,
+        target: phone
       })
     const res = await updateEmail(uid, id)
     expect(res).toEqual({ status: 'valid' })

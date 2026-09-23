@@ -57,7 +57,7 @@ export function auditOtpIssued(uid, email) {
  * @param {string} email - the new email address
  */
 export function auditEmailChanged(accountId, email) {
-  auditEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, { email })
+  auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, email, { email })
 }
 
 /**

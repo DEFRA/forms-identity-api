@@ -1,4 +1,3 @@
-import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { updateEmail } from '~/src/services/account-service.js'
@@ -35,13 +34,13 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
-    async handler(request, h) {
+    async handler(request) {
       const { uid, id } = /** @type {{ uid: string, id: string }} */ (
         request.params
       )
       // New email is derived from OTP that has been verified
-      await updateEmail(uid, id)
-      return h.response().code(StatusCodes.OK)
+      const res = await updateEmail(uid, id)
+      return res
     }
   }
 ])

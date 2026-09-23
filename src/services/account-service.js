@@ -9,21 +9,35 @@ import * as otpsRepository from '~/src/repositories/otps-repository.js'
  * @param {string} id
  */
 export async function updateEmail(uid, id) {
-  // Check we have the verified OTP record for the correct account
-  const filterOtp = {
+  // Check we have the verified 'email' OTP record for the correct account
+  const filterEmailOtp = {
     uid,
     purpose: PURPOSE.ACCOUNT_VERIFY_EMAIL,
     verified: true,
     consumed: false,
     accountId: id
   }
-  const doc = await otpsRepository.findOne(filterOtp)
+  const otpEmail = await otpsRepository.findOne(filterEmailOtp)
 
-  if (!doc) {
+  if (!otpEmail) {
     return { status: STATUS.INVALID }
   }
 
-  const newEmail = doc.target.toLowerCase()
+  // Check we have the verified 'phone' OTP record for the correct account
+  // This is belt-and-braces as the UI enforces this too, but better to be safe here
+  const filterPhoneOtp = {
+    uid,
+    purpose: PURPOSE.ACCOUNT_VERIFY_PHONE,
+    verified: true,
+    consumed: false,
+    accountId: id
+  }
+  const otpPhone = await otpsRepository.findOne(filterPhoneOtp)
+  if (!otpPhone) {
+    return { status: STATUS.INVALID }
+  }
+
+  const newEmail = otpEmail.target.toLowerCase()
 
   // Check the account exists
   const account = await accountsRepository.findById(id)
@@ -32,17 +46,21 @@ export async function updateEmail(uid, id) {
     return { status: STATUS.INVALID }
   }
 
-  /** @type {AccountDocument} */
+  /** @type {Partial<AccountDocument>} */
   const accountUpdate = {
-    ...account,
     email: newEmail,
     updatedAt: new Date()
   }
   await accountsRepository.update(id, accountUpdate)
 
-  const consumed = await otpsRepository.update(filterOtp, { consumed: true })
+  const consumedEmail = await otpsRepository.update(filterEmailOtp, {
+    consumed: true
+  })
+  const consumedPhone = await otpsRepository.update(filterEmailOtp, {
+    consumed: true
+  })
 
-  if (!consumed) {
+  if (!consumedEmail || !consumedPhone) {
     return { status: STATUS.INVALID } // a concurrent submit already completed
   }
 

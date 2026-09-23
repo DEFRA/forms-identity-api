@@ -49,13 +49,10 @@ export async function insert(account) {
 /**
  * Updates an account document
  * @param {string} id
- * @param {AccountDocument} account
+ * @param {Partial<AccountDocument>} fields
  */
-export async function update(id, account) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- excluded from $set below
-  const { _id, ...fields } = account
+export async function update(id, fields) {
   await coll().updateOne({ _id: id }, { $set: fields })
-  return account
 }
 
 /**

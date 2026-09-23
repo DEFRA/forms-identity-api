@@ -288,18 +288,6 @@ export async function findOtp(uid, purpose) {
 }
 
 /**
- * Removes any OTP records associated with an interaction.
- * Primarily when an interaction consists of multiple OTPS and they all need cleaning down at the end of the interaction.
- * Ignores failure if not found.
- * @param {string} uid
- */
-export async function removeOtps(uid) {
-  await otpsRepository.deleteMany({
-    uid
-  })
-}
-
-/**
  * @import { Filter, WithId } from 'mongodb'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
  * @import { PurposeType } from '~/src/constants.js'
