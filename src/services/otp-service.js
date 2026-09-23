@@ -173,7 +173,7 @@ export async function verifyOtp(uid, code, purpose, id) {
     : await accountsRepository.findByEmail(doc.target)
 
   if (account) {
-    return await handleWhenAccount(account, uid, purpose, claim, failResult)
+    return handleWhenAccountExists(account, uid, purpose, claim, failResult)
   }
 
   const verified = await otpsRepository.update(claim, { verified: true })
@@ -192,7 +192,13 @@ export async function verifyOtp(uid, code, purpose, id) {
  * @param {ClaimType} claim
  * @param {VerifyResult} failResult
  */
-async function handleWhenAccount(account, uid, purpose, claim, failResult) {
+async function handleWhenAccountExists(
+  account,
+  uid,
+  purpose,
+  claim,
+  failResult
+) {
   if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL) {
     const consumed = await otpsRepository.update(claim, { consumed: true })
 
