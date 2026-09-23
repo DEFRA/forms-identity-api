@@ -112,7 +112,8 @@ describe('signin routes', () => {
       expect(verifyOtp).toHaveBeenLastCalledWith(
         'uid-1',
         code,
-        'SIGNIN_VERIFY_EMAIL'
+        'SIGNIN_VERIFY_EMAIL',
+        undefined
       )
     }
   })

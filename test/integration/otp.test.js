@@ -1,5 +1,6 @@
-import { TRANSPORT } from '~/src/constants.js'
+import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
+import { findById } from '~/src/repositories/accounts-repository.js'
 import { deleteMany } from '~/src/repositories/otps-repository.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
@@ -8,6 +9,7 @@ jest.mock('~/src/lib/notify.js', () => ({
   sendSms: jest.fn()
 }))
 jest.mock('~/src/repositories/otps-repository.js')
+jest.mock('~/src/repositories/accounts-repository.js')
 
 const { inject } = setupSigninFlow()
 
@@ -34,14 +36,16 @@ describe('OTP endpoints', () => {
     })
 
     it('accepts valid OTP request for SMS', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({ phone: '+447507123456' })
       const res = await inject({
         method: 'POST',
         url: '/otp/request',
         payload: {
           uid: 'uid-1',
-          target: '+447507123456',
           transport: TRANSPORT.SMS,
-          accountId: 'acc-1'
+          accountId: 'acc-1',
+          purpose: PURPOSE.ACCOUNT_VERIFY_PHONE
         }
       })
 

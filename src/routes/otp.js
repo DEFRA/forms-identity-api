@@ -1,8 +1,8 @@
+import Boom from '@hapi/boom'
 import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
-import { joi as telephoneJoi } from '~/src/lib/telephone.js'
 import {
   findOtp,
   removeOtps,
@@ -31,17 +31,16 @@ export default /** @type {ServerRoute[]} */ ([
           uid: Joi.string().required(),
           transport: transportSchema,
           purpose: purposeSchema,
-          accountId: Joi.when('transport', {
-            is: TRANSPORT.SMS,
-            then: Joi.string().required(),
+          // Account id should only be allowed for ACCOUNT_ purposes
+          accountId: Joi.when('purpose', {
+            is: PURPOSE.SIGNIN_VERIFY_EMAIL,
+            then: Joi.forbidden(),
             otherwise: Joi.string().allow('')
           }),
           target: Joi.when('transport', {
             is: TRANSPORT.EMAIL,
             then: Joi.string().email().required(),
-            otherwise: /** @type {TelephoneSchema} */ (
-              telephoneJoi.string()
-            ).phoneNumber()
+            otherwise: Joi.forbidden()
           })
         })
       }
@@ -51,6 +50,25 @@ export default /** @type {ServerRoute[]} */ ([
         /** @type {{ uid: string, transport: TransportType, purpose: PurposeType, accountId?: string, target: string }} */ (
           request.payload
         )
+      // Further guards (in addition to Joi schema)
+      if (
+        purpose === PURPOSE.SIGNIN_VERIFY_EMAIL &&
+        transport !== TRANSPORT.EMAIL
+      ) {
+        throw Boom.badRequest()
+      }
+      if (
+        purpose === PURPOSE.ACCOUNT_VERIFY_EMAIL &&
+        transport !== TRANSPORT.EMAIL
+      ) {
+        throw Boom.badRequest()
+      }
+      if (
+        purpose === PURPOSE.ACCOUNT_VERIFY_PHONE &&
+        transport !== TRANSPORT.SMS
+      ) {
+        throw Boom.badRequest()
+      }
       await requestOtp(uid, target, transport, purpose, accountId)
       return h.response().code(StatusCodes.NO_CONTENT)
     }
@@ -63,16 +81,21 @@ export default /** @type {ServerRoute[]} */ ([
         payload: Joi.object({
           uid: Joi.string().required(),
           code: Joi.string().allow('').required(),
+          id: Joi.when('purpose', {
+            is: PURPOSE.SIGNIN_VERIFY_EMAIL,
+            then: Joi.forbidden(),
+            otherwise: Joi.string().required()
+          }),
           purpose: purposeSchema
         })
       }
     },
     handler(request) {
-      const { uid, code, purpose } =
-        /** @type {{ uid: string, code: string, purpose: PurposeType }} */ (
+      const { uid, code, id, purpose } =
+        /** @type {{ uid: string, code: string, purpose: PurposeType, id?: string }} */ (
           request.payload
         )
-      return verifyOtp(uid, code, purpose)
+      return verifyOtp(uid, code, purpose, id)
     }
   },
   {

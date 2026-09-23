@@ -23,19 +23,32 @@ const OTP_NOTIFY_SMS_TEMPLATE_ID = config.get('otp.notify.smsTemplateId')
  * {uid, purpose} (upsert = resend semantics: one live code per authority
  * per interaction) and delivers the plaintext via Notify
  * @param {string} uid
- * @param {string} emailAddressOrPhoneNumber
+ * @param { string | undefined } email - not used if sending by SMS
  * @param {typeof TRANSPORT[keyof typeof TRANSPORT]} transportType
  * @param {PurposeType} purpose
  * @param {string} [accountId] - id of account if email address not passed in
  */
 export async function requestOtp(
   uid,
-  emailAddressOrPhoneNumber,
+  email,
   transportType,
   purpose,
   accountId
 ) {
-  const target = emailAddressOrPhoneNumber.toLowerCase()
+  let target = email?.toLowerCase()
+  if (accountId) {
+    // Verify account exists and contains the correct phone number
+    const account = await accountsRepository.findById(accountId)
+    if (!account) {
+      throw Boom.badRequest()
+    }
+
+    if (purpose === PURPOSE.ACCOUNT_VERIFY_PHONE) {
+      // Get phone from account - ignore anything passed in
+      target = account.phone
+    }
+  }
+
   const code = generateCode()
   const codeHash = await argon2.hash(code)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
@@ -54,9 +67,9 @@ export async function requestOtp(
   )
 
   if (transportType === TRANSPORT.EMAIL) {
-    await sendOtpEmail(target, code)
+    await sendOtpEmail(/** @type {string} */ (target), code)
   } else {
-    await sendOtpSms(target, code)
+    await sendOtpSms(/** @type {string} */ (target), code)
   }
 }
 
@@ -98,20 +111,25 @@ function sendOtpSms(phoneNumber, code) {
  * @param {string} uid
  * @param {string} code
  * @param {PurposeType} purpose
+ * @param {string} [id] - account id
  * @returns {Promise<VerifyResult>}
  */
-export async function verifyOtp(uid, code, purpose) {
+export async function verifyOtp(uid, code, purpose, id) {
   // A code that fails the shape schema cannot be a real code: turn it away as
   // invalid before any lookup, and without spending a guess.
   if (codeSchema.validate(code).error) {
     return { status: STATUS.INVALID_CODE_FORMAT }
   }
 
+  /** @type {{ uid: string, purpose: PurposeType, verified: boolean, consumed: boolean, accountId?: string }} */
   const filter = {
     uid,
     purpose,
     verified: false,
     consumed: false
+  }
+  if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
+    filter.accountId = id
   }
   const doc = await otpsRepository.findOne(filter)
 
@@ -163,7 +181,7 @@ export async function verifyOtp(uid, code, purpose) {
       return failResult
     }
 
-    return { status: STATUS.VALID, email: account.email, phone: account.phone }
+    return { status: STATUS.VALID }
   }
 
   const verified = await otpsRepository.update(claim, { verified: true })
@@ -258,6 +276,6 @@ export async function removeOtps(uid) {
  * @import { Filter } from 'mongodb'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
  * @import {PurposeType} from '~/src/constants.js'
- * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string } | { status: 'valid', email: string, phone: string }} VerifyResult
+ * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string } | { status: 'valid' }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */

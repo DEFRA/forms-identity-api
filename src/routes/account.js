@@ -32,9 +32,6 @@ export default /** @type {ServerRoute[]} */ ([
         params: Joi.object({
           uid: Joi.string().required(),
           id: Joi.string().required()
-        }),
-        payload: Joi.object({
-          email: Joi.string().email().required()
         })
       }
     },
@@ -42,8 +39,8 @@ export default /** @type {ServerRoute[]} */ ([
       const { uid, id } = /** @type {{ uid: string, id: string }} */ (
         request.params
       )
-      const { email } = /** @type {{ email: string }} */ (request.payload)
-      await updateEmail(uid, id, email)
+      // New email is derived from OTP that has been verified
+      await updateEmail(uid, id)
       return h.response().code(StatusCodes.OK)
     }
   }

@@ -23,11 +23,10 @@ describe('account routes', () => {
 
     const res = await server.inject({
       method: 'PATCH',
-      url: '/accounts/uid-1/acc-id/email',
-      payload: { email: 'a@b.com' }
+      url: '/accounts/uid-1/acc-id/email'
     })
 
     expect(res.statusCode).toBe(200)
-    expect(updateEmail).toHaveBeenCalledWith('uid-1', 'acc-id', 'a@b.com')
+    expect(updateEmail).toHaveBeenCalledWith('uid-1', 'acc-id')
   })
 })
