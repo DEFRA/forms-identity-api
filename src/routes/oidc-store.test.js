@@ -62,8 +62,8 @@ describe('oidc store routes', () => {
   })
 
   it('accepts refresh_token on every model route', async () => {
-    // the provider stores, reads, consumes (on rotation) and deletes refresh
-    // tokens through these routes
+    // the provider stores, reads and deletes refresh tokens through these
+    // routes; it only consumes one if refresh token rotation is turned on
     jest.mocked(find).mockResolvedValue({ grantId: 'g-1' })
     jest.mocked(destroy).mockResolvedValue({ grantId: 'g-1' })
     const server = await buildServer()
