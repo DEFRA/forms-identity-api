@@ -19,8 +19,6 @@ export const OIDC_COLLECTION_NAMES = [
   'grant',
   'authorization_code',
   'access_token',
-  // issued alongside each access token, and replaced (the old one marked
-  // consumed) on every refresh
   'refresh_token',
   // one row per client assertion id, so a captured assertion cannot be
   // replayed within its lifetime — required by private_key_jwt client auth

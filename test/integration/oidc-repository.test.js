@@ -81,8 +81,6 @@ describe('oidc store', () => {
   })
 
   it('stores, consumes and destroys refresh tokens', async () => {
-    // the provider marks a refresh token consumed when it replaces it, and
-    // reads it back to refuse (and revoke the grant on) a second use
     await upsert('refresh_token', 'r-1', { grantId: 'g-1', kind: 'x' }, 60)
 
     await expect(find('refresh_token', 'r-1')).resolves.toEqual({
