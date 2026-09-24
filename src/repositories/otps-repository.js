@@ -6,6 +6,7 @@ import { OTPS_COLLECTION_NAME, db } from '~/src/mongo.js'
  * @property {string} uid - the interaction uid the code was issued for
  * @property {string} purpose - the authority granted (JOURNEY_CHALLENGE)
  * @property {string} target - lowercased email the code was sent to
+ * @property {string} accountId - id to potentially lookup account if target is a phone number
  * @property {string} codeHash - argon2 hash (plaintext is never stored)
  * @property {number} attempts - failed verification attempts so far
  * @property {boolean} verified - correct code entered, completion pending
@@ -29,6 +30,13 @@ function coll() {
  */
 export function findOne(filter) {
   return coll().findOne(filter)
+}
+
+/**
+ * @param {Filter<OtpDocument>} filter
+ */
+export function deleteMany(filter) {
+  return coll().deleteMany(filter)
 }
 
 /**

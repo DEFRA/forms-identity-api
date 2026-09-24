@@ -91,7 +91,7 @@ export function setupSigninFlow() {
     const res = await inject({
       method: 'POST',
       url: '/otp/request',
-      payload: { uid, email }
+      payload: { uid, target: email }
     })
     expect(res.statusCode).toBe(StatusCodes.NO_CONTENT)
     return lastSentCode()

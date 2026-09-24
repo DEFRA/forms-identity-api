@@ -1,7 +1,7 @@
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
-import { PURPOSE } from '~/src/constants.js'
+import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import {
   auditOtpIssued,
   auditRegistration,
@@ -10,13 +10,11 @@ import {
 import { sendEmail } from '~/src/lib/notify.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
+import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 import {
   completeSignup,
   createAccount,
-  findAccountById,
-  findSigninEmail,
-  requestOtp,
-  verifyOtp
+  findAccountById
 } from '~/src/services/signin-service.js'
 
 jest.mock('~/src/repositories/otps-repository.js', () => ({
@@ -107,7 +105,7 @@ function lastSentCode() {
  * @param {string} uid
  */
 async function request(uid, email = 'a@b.com') {
-  await requestOtp(uid, email)
+  await requestOtp(uid, email, TRANSPORT.EMAIL, PURPOSE.SIGNIN_VERIFY_EMAIL)
   return lastSentCode()
 }
 
@@ -116,7 +114,12 @@ describe('signin service', () => {
     it('stores an argon2 hash keyed by {uid, purpose} and sends the code', async () => {
       const docs = build()
 
-      await requestOtp('uid-1', 'A@B.com')
+      await requestOtp(
+        'uid-1',
+        'A@B.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(sendEmail).toHaveBeenCalledWith(
         process.env.NOTIFY_OTP_TEMPLATE_ID,
@@ -146,7 +149,12 @@ describe('signin service', () => {
       try {
         for (let attempt = 0; attempt < 500; attempt++) {
           build()
-          await requestOtp('uid-1', 'a@b.com')
+          await requestOtp(
+            'uid-1',
+            'a@b.com',
+            TRANSPORT.EMAIL,
+            PURPOSE.SIGNIN_VERIFY_EMAIL
+          )
           const code = lastSentCode()
           expect(code).toMatch(/^\d{6}$/)
           sawLeadingZero ||= code.startsWith('0')
@@ -161,7 +169,12 @@ describe('signin service', () => {
     it('audits the issue against the interaction and the normalised address', async () => {
       build()
 
-      await requestOtp('uid-1', 'A@B.com')
+      await requestOtp(
+        'uid-1',
+        'A@B.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(auditOtpIssued).toHaveBeenCalledWith('uid-1', 'a@b.com')
     })
@@ -169,8 +182,18 @@ describe('signin service', () => {
     it('audits every resend, so the trail counts the codes sent', async () => {
       build()
 
-      await requestOtp('uid-1', 'a@b.com')
-      await requestOtp('uid-1', 'a@b.com')
+      await requestOtp(
+        'uid-1',
+        'a@b.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
+      await requestOtp(
+        'uid-1',
+        'a@b.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(auditOtpIssued).toHaveBeenCalledTimes(2)
     })
@@ -181,9 +204,14 @@ describe('signin service', () => {
       build()
       jest.mocked(sendEmail).mockRejectedValue(new Error('Notify is down'))
 
-      await expect(requestOtp('uid-1', 'a@b.com')).rejects.toThrow(
-        'Notify is down'
-      )
+      await expect(
+        requestOtp(
+          'uid-1',
+          'a@b.com',
+          TRANSPORT.EMAIL,
+          PURPOSE.SIGNIN_VERIFY_EMAIL
+        )
+      ).rejects.toThrow('Notify is down')
       expect(auditOtpIssued).not.toHaveBeenCalled()
     })
   })
@@ -202,10 +230,12 @@ describe('signin service', () => {
       jest.mocked(otpsRepository.update).mockResolvedValue(false)
 
       for (let i = 0; i < 5; i++) {
-        await verifyOtp('uid-budget', wrong)
+        await verifyOtp('uid-budget', wrong, PURPOSE.SIGNIN_VERIFY_EMAIL)
       }
 
-      await expect(verifyOtp('uid-budget', code)).resolves.toEqual({
+      await expect(
+        verifyOtp('uid-budget', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).resolves.toEqual({
         status: 'invalid-code-consumed-or-expired'
       })
     })
@@ -219,7 +249,7 @@ describe('signin service', () => {
         )
       const code = await request('uid-1')
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-1' })
       expect(docs[0].consumed).toBe(true)
@@ -239,7 +269,7 @@ describe('signin service', () => {
         )
       const code = await request('uid-other')
 
-      await verifyOtp('uid-other', code)
+      await verifyOtp('uid-other', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(auditSignIn).toHaveBeenCalledWith('acc-1', 'a@b.com', 'uid-other')
     })
@@ -252,7 +282,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid' })
       expect(auditSignIn).not.toHaveBeenCalled()
@@ -262,7 +292,7 @@ describe('signin service', () => {
       const docs = build()
       const code = await request('uid-1')
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'phone-required' })
       expect(docs[0].verified).toBe(true)
@@ -276,7 +306,11 @@ describe('signin service', () => {
       const codeA = await request('uid-a')
       await request('uid-b')
 
-      const result = await verifyOtp('uid-b', codeA)
+      const result = await verifyOtp(
+        'uid-b',
+        codeA,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs.find((d) => d.uid === 'uid-b')?.attempts).toBe(1)
@@ -299,7 +333,7 @@ describe('signin service', () => {
         expireAt: new Date(Date.now() + 60_000)
       })
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'phone-required' })
       const recovery = docs.find((d) => d.purpose === 'RECOVERY_VERIFY_PHONE')
@@ -312,7 +346,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       docs[0].expireAt = new Date(Date.now() - 1000)
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid-code-consumed-or-expired' })
     })
@@ -322,9 +356,9 @@ describe('signin service', () => {
       const code = await request('uid-1')
 
       for (let i = 0; i < 4; i++) {
-        await verifyOtp('uid-1', '000001')
+        await verifyOtp('uid-1', '000001', PURPOSE.SIGNIN_VERIFY_EMAIL)
       }
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'phone-required' })
       expect(docs[0].consumed).toBe(false)
@@ -335,9 +369,9 @@ describe('signin service', () => {
       const code = await request('uid-1')
 
       for (let i = 0; i < 5; i++) {
-        await verifyOtp('uid-1', '000001')
+        await verifyOtp('uid-1', '000001', PURPOSE.SIGNIN_VERIFY_EMAIL)
       }
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid-code-consumed-or-expired' })
       expect(docs[0].consumed).toBe(true)
@@ -346,9 +380,9 @@ describe('signin service', () => {
     it('rejects re-verification once verified (one-way state machine)', async () => {
       build()
       const code = await request('uid-1')
-      await verifyOtp('uid-1', code)
+      await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid-code-consumed-or-expired' })
     })
@@ -364,7 +398,7 @@ describe('signin service', () => {
       'abc123',
       '*&^%$£'
     ])('returns invalid-code-format (%s)', async (code) => {
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid-code-format' })
     })
@@ -375,7 +409,7 @@ describe('signin service', () => {
     async function verified() {
       const docs = build()
       const code = await request('uid-1')
-      await verifyOtp('uid-1', code)
+      await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
       return docs
     }
 
@@ -545,7 +579,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -555,7 +589,7 @@ describe('signin service', () => {
       const code = await request('uid-1')
       jest.mocked(otpsRepository.update).mockResolvedValueOnce(false)
 
-      const result = await verifyOtp('uid-1', code)
+      const result = await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -563,7 +597,7 @@ describe('signin service', () => {
     it('completeSignup returns invalid when a concurrent submit completes first', async () => {
       const docs = build()
       const code = await request('uid-1')
-      await verifyOtp('uid-1', code)
+      await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
       jest
         .mocked(accountsRepository.insert)
         .mockImplementation((account) => Promise.resolve(account))
@@ -602,7 +636,11 @@ describe('signin service', () => {
           return doc
         })
 
-      const result = await verifyOtp('uid-1', codeA)
+      const result = await verifyOtp(
+        'uid-1',
+        codeA,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(result).toEqual({ status: 'invalid' })
     })
@@ -626,7 +664,11 @@ describe('signin service', () => {
           return doc
         })
 
-      const result = await verifyOtp('uid-1', '000001')
+      const result = await verifyOtp(
+        'uid-1',
+        '000001',
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
 
       expect(result).toEqual({ status: 'invalid' })
       expect(docs[0].attempts).toBe(0)
@@ -641,8 +683,12 @@ describe('signin service', () => {
       const codeB = await request('uid-1')
 
       expect(docs).toHaveLength(1)
-      expect(await verifyOtp('uid-1', codeA)).toEqual({ status: 'invalid' })
-      expect(await verifyOtp('uid-1', codeB)).toEqual({
+      expect(
+        await verifyOtp('uid-1', codeA, PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).toEqual({ status: 'invalid' })
+      expect(
+        await verifyOtp('uid-1', codeB, PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).toEqual({
         status: 'phone-required'
       })
     })
@@ -651,14 +697,16 @@ describe('signin service', () => {
       build()
       await request('uid-1')
       for (let i = 0; i < 4; i++) {
-        await verifyOtp('uid-1', '000001')
+        await verifyOtp('uid-1', '000001', PURPOSE.SIGNIN_VERIFY_EMAIL)
       }
       const codeB = await request('uid-1')
       for (let i = 0; i < 4; i++) {
-        await verifyOtp('uid-1', '000001')
+        await verifyOtp('uid-1', '000001', PURPOSE.SIGNIN_VERIFY_EMAIL)
       }
 
-      expect(await verifyOtp('uid-1', codeB)).toEqual({
+      expect(
+        await verifyOtp('uid-1', codeB, PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).toEqual({
         status: 'phone-required'
       })
     })
@@ -670,11 +718,13 @@ describe('signin service', () => {
       build()
       await request('uid-1')
       for (let i = 0; i < 5; i++) {
-        await verifyOtp('uid-1', '000001')
+        await verifyOtp('uid-1', '000001', PURPOSE.SIGNIN_VERIFY_EMAIL)
       }
       const codeB = await request('uid-1')
 
-      expect(await verifyOtp('uid-1', codeB)).toEqual({
+      expect(
+        await verifyOtp('uid-1', codeB, PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).toEqual({
         status: 'phone-required'
       })
     })
@@ -684,7 +734,7 @@ describe('signin service', () => {
       // signup must re-verify before completion is legal again
       build()
       const codeA = await request('uid-1')
-      await verifyOtp('uid-1', codeA)
+      await verifyOtp('uid-1', codeA, PURPOSE.SIGNIN_VERIFY_EMAIL)
       await request('uid-1')
 
       const result = await completeSignup('uid-1', '07911 123456')
@@ -694,21 +744,29 @@ describe('signin service', () => {
     })
   })
 
-  describe('findSigninEmail', () => {
+  describe('findOtp', () => {
     it('returns the stored target for the interaction', async () => {
       build()
       await request('uid-1', 'Someone@Example.com')
 
-      await expect(findSigninEmail('uid-1')).resolves.toBe(
-        'someone@example.com'
-      )
+      await expect(
+        findOtp('uid-1', PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).resolves.toEqual({
+        consumed: false,
+        target: 'someone@example.com',
+        verified: false
+      })
     })
 
     it('throws Boom.notFound when no code was requested', async () => {
       build()
 
-      await expect(findSigninEmail('uid-none')).rejects.toThrow(
-        Boom.notFound('No sign-in code for this interaction')
+      await expect(
+        findOtp('uid-none', PURPOSE.SIGNIN_VERIFY_EMAIL)
+      ).rejects.toThrow(
+        Boom.notFound(
+          'No code for this interaction of purpose SIGNIN_VERIFY_EMAIL'
+        )
       )
     })
   })

@@ -3,9 +3,14 @@ import { token } from '@hapi/jwt'
 import { config } from '~/src/config/index.js'
 import { postJson } from '~/src/lib/fetch.js'
 
-const NOTIFICATIONS_URL = new URL(
+const NOTIFICATIONS_BASE = 'https://api.notifications.service.gov.uk'
+const NOTIFICATIONS_EMAIL_URL = new URL(
   '/v2/notifications/email',
-  'https://api.notifications.service.gov.uk'
+  NOTIFICATIONS_BASE
+)
+const NOTIFICATIONS_SMS_URL = new URL(
+  '/v2/notifications/sms',
+  NOTIFICATIONS_BASE
 )
 
 const API_KEY_SUBSTRING_REDUCTION = 36
@@ -44,12 +49,34 @@ const serviceId = apiKey.substring(
  * @param {Record<string, string | number>} personalisation - template placeholder values
  */
 export async function sendEmail(templateId, emailAddress, personalisation) {
-  await postJson(NOTIFICATIONS_URL, {
+  await postJson(NOTIFICATIONS_EMAIL_URL, {
     payload: {
       template_id: templateId,
       email_address: emailAddress,
       personalisation,
       email_reply_to_id: replyToId
+    },
+    headers: {
+      Authorization: 'Bearer ' + createToken(serviceId, apiKeyId)
+    }
+  })
+}
+
+/**
+ * Sends an SMS through the GOV.UK Notify API over `~/src/lib/fetch.js`
+ * (Wreck) rather than `notifications-node-client`, so the request goes through
+ * the CDP egress ProxyAgent that Wreck routes through. Authentication tokens
+ * are created internally.
+ * @param {string} templateId - Notify template to send
+ * @param {string} phoneNumber - recipient
+ * @param {Record<string, string | number>} personalisation - template placeholder values
+ */
+export async function sendSms(templateId, phoneNumber, personalisation) {
+  await postJson(NOTIFICATIONS_SMS_URL, {
+    payload: {
+      template_id: templateId,
+      phone_number: phoneNumber,
+      personalisation
     },
     headers: {
       Authorization: 'Bearer ' + createToken(serviceId, apiKeyId)
