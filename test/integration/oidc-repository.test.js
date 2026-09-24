@@ -81,10 +81,6 @@ describe('oidc store', () => {
   })
 
   it('stores, consumes and destroys refresh tokens', async () => {
-    // with refresh token rotation turned on, the provider marks a refresh
-    // token consumed when it replaces it, and reads it back to refuse (and
-    // revoke the grant on) a second use. Rotation is off, but the store
-    // still supports it.
     await upsert('refresh_token', 'r-1', { grantId: 'g-1', kind: 'x' }, 60)
 
     await expect(find('refresh_token', 'r-1')).resolves.toEqual({
