@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import { setUserId } from '@defra/forms-common'
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
@@ -127,6 +128,7 @@ export async function verifyOtp(uid, code) {
       return failResult // concurrently spent or superseded by a resend
     }
 
+    setUserId(account._id)
     auditSignIn(account._id, account.email, uid)
 
     return { status: STATUS.SIGNED_IN, accountId: account._id }
@@ -218,6 +220,7 @@ export async function completeSignup(uid, phone) {
     return { status: STATUS.INVALID } // a concurrent submit already completed
   }
 
+  setUserId(account._id)
   auditRegistration(account._id, account.email, account.phone)
   auditSignIn(account._id, account.email, uid)
 
