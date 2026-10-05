@@ -1,3 +1,4 @@
+// @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
 
 import { findById } from '~/src/repositories/accounts-repository.js'

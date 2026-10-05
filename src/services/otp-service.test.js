@@ -1,3 +1,4 @@
+// @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
@@ -69,9 +70,9 @@ describe('otp-service', () => {
     })
 
     it('should create OTP for phone', async () => {
-      // @ts-expect-error - partial mock of test data
       jest
         .mocked(findById)
+        // @ts-expect-error - partial mock of test data
         .mockResolvedValueOnce({
           phone: '+447507123456',
           email: 'test-email@test.com'
