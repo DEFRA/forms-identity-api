@@ -1,8 +1,4 @@
-import {
-  OTP_LOCKOUTS_COLLECTION_NAME,
-  db,
-  isDuplicateKeyError
-} from '~/src/mongo.js'
+import { OTP_LOCKOUTS_COLLECTION_NAME, db } from '~/src/mongo.js'
 
 /**
  * @typedef {object} OtpLockoutDocument
@@ -61,29 +57,21 @@ export async function incrementRequests(key, fields, onInsert) {
     $setOnInsert: { ...onInsert, createdAt: new Date() }
   }
 
-  try {
-    const doc = await coll().findOneAndUpdate(key, updateRequest, {
-      upsert: true,
-      returnDocument: 'after'
-    })
+  // Two first requests for an address in flight together both take the
+  // insert path, and the unique index rejects the loser. MongoDB (4.2+)
+  // retries that upsert on the server, so it becomes an increment of the
+  // winner's counter and no duplicate key error reaches us. The server only
+  // does this when the filter is equality matches on exactly the unique
+  // index's fields ({ target }) and the update leaves those fields alone, so
+  // keep the filter to `target` alone.
+  // https://www.mongodb.com/docs/v7.0/reference/command/findAndModify/#upsert-with-unique-index
+  const doc = await coll().findOneAndUpdate(key, updateRequest, {
+    upsert: true,
+    returnDocument: 'after'
+  })
 
-    // upsert with returnDocument 'after' always yields a document
-    return /** @type {OtpLockoutDocument} */ (doc)
-  } catch (err) {
-    if (!isDuplicateKeyError(err)) {
-      throw err
-    }
-
-    // Two first requests for an address in flight together both take the
-    // insert path, and the unique index rejects the loser. The winner's
-    // counter now exists, so the same call is an increment second time
-    // round: retry once rather than fail a request that should be counted.
-    const doc = await coll().findOneAndUpdate(key, updateRequest, {
-      returnDocument: 'after'
-    })
-
-    return /** @type {OtpLockoutDocument} */ (doc)
-  }
+  // upsert with returnDocument 'after' always yields a document
+  return /** @type {OtpLockoutDocument} */ (doc)
 }
 
 /**

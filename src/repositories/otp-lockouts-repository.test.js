@@ -4,19 +4,12 @@ const findOneAndUpdate = jest.fn()
 
 jest.mock('~/src/mongo.js', () => ({
   OTP_LOCKOUTS_COLLECTION_NAME: 'otp-lockouts',
-  db: { collection: () => ({ findOneAndUpdate: mockFindOneAndUpdate }) },
-  isDuplicateKeyError: (/** @type {unknown} */ err) =>
-    err instanceof Error && 'code' in err && err.code === 11000
+  db: { collection: () => ({ findOneAndUpdate: mockFindOneAndUpdate }) }
 }))
 
 /** Hoisted alongside the jest.mock factory, which runs before the imports */
 function mockFindOneAndUpdate(/** @type {unknown[]} */ ...args) {
   return findOneAndUpdate(...args)
-}
-
-/** A real Mongo duplicate-key rejection */
-function duplicateKeyError() {
-  return Object.assign(new Error('E11000 duplicate key error'), { code: 11000 })
 }
 
 const KEY = { target: 'a@b.com' }
@@ -37,24 +30,9 @@ describe('otp lockouts repository', () => {
     )
   })
 
-  it('retries as a plain increment when a racing request minted the counter first', async () => {
-    // losing the insert race must still count the request, not fail it
-    findOneAndUpdate
-      .mockRejectedValueOnce(duplicateKeyError())
-      .mockResolvedValueOnce({ ...KEY, requests: 2 })
-
-    await expect(incrementRequests(KEY, {}, {})).resolves.toEqual({
-      ...KEY,
-      requests: 2
-    })
-    expect(findOneAndUpdate).toHaveBeenLastCalledWith(
-      KEY,
-      expect.objectContaining({ $inc: { requests: 1 } }),
-      { returnDocument: 'after' }
-    )
-  })
-
-  it('rethrows anything that is not a duplicate key', async () => {
+  it('rethrows a failed upsert without retrying it', async () => {
+    // racing first requests are resolved by the server's own upsert retry,
+    // so any error that does reach us is a real failure
     findOneAndUpdate.mockRejectedValue(new Error('mongo is down'))
 
     await expect(incrementRequests(KEY, {}, {})).rejects.toThrow(
