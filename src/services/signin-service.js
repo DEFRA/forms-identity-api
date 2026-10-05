@@ -86,19 +86,29 @@ async function claimOtpRequest(uid, target) {
   const key = { target }
   const existing = await otpLockoutsRepository.findOne(key)
 
+  // The address is locked. Refuse the request and leave the record as it
+  // is, so that requests during a lockout keep the same unlock time
   if (existing?.lockedUntil && existing.lockedUntil.getTime() > now.getTime()) {
     return existing.lockedUntil
   }
 
   if (existing && hasWindowElapsed(existing, now)) {
-    // Filter condition in the update to prevent race condition where
-    // we reset a non-elapsed, non-zero lockout record.
+    // The record is from a window or a lockout that has ended. Start a new
+    // window: set the count to zero and clear the old lock. Without this
+    // step, the old count stays and this request is refused.
+    //
+    // The filter includes the windowStartedAt value that was read, so that
+    // only one of several concurrent requests does the reset. The others
+    // match nothing and their counts are added to the new window.
     await otpLockoutsRepository.update(
       { ...key, windowStartedAt: existing.windowStartedAt },
       { windowStartedAt: now, requests: 0, lockedUntil: null }
     )
   }
 
+  // Count this request. The first request for an address creates the
+  // record. Each request moves expireAt forward, so that Mongo deletes the
+  // record only after the window and a possible lockout have both ended.
   const counter = await otpLockoutsRepository.incrementRequests(
     key,
     { expireAt: new Date(now.getTime() + LOCKOUT_WINDOW_MS + LOCKOUT_MS) },
@@ -106,9 +116,14 @@ async function claimOtpRequest(uid, target) {
   )
 
   if (counter.requests <= LOCKOUT_MAX_REQUESTS) {
+    // The count is in the limit: permit the request.
     return null
   }
 
+  // The count is above the limit: lock the address. The filter matches
+  // only a record that has no lock, so that one of several concurrent
+  // requests sets the lock and writes the audit record. The others are
+  // refused with no second audit record.
   const lockedUntil = new Date(now.getTime() + LOCKOUT_MS)
 
   const locked = await otpLockoutsRepository.update(
@@ -223,6 +238,9 @@ export async function verifyOtp(uid, code) {
   const account = await accountsRepository.findByEmail(doc.target)
 
   if (account) {
+    // A successful sign-in shows that the user owns the address, so set the
+    // OTP request count back to zero. The next sign-in then starts with the
+    // full number of requests.
     await clearRequestCount(doc.target)
 
     const consumed = await otpsRepository.update(claim, { consumed: true })

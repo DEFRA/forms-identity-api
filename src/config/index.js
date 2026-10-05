@@ -134,7 +134,7 @@ export const config = convict({
     lockout: {
       /** @type {SchemaObj<number>} */
       maxRequests: {
-        doc: 'Codes an email address may request within one window before it is locked out. The request that goes past this number is refused, so with the default the sixth request in a window is the one that locks the address.',
+        doc: 'Codes an email address may request within one window before it is locked out.',
         format: Number,
         default: 5,
         env: 'OTP_LOCKOUT_MAX_REQUESTS'
