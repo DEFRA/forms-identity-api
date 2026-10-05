@@ -40,8 +40,9 @@ export async function requestOtp(
   accountId
 ) {
   let target = email?.toLowerCase()
+  let accountEmail = ''
   if (accountId) {
-    // Verify account exists and contains the correct phone number
+    // Verify account exists
     const account = await accountsRepository.findById(accountId)
     if (!account) {
       throw Boom.badRequest()
@@ -50,6 +51,8 @@ export async function requestOtp(
     if (purpose === PURPOSE.ACCOUNT_VERIFY_PHONE) {
       // Get phone from account - ignore anything passed in
       target = account.phone
+      // Get account email for auditing purposes
+      accountEmail = account.email
     }
   }
 
@@ -76,11 +79,11 @@ export async function requestOtp(
 
   if (transportType === TRANSPORT.EMAIL) {
     await sendOtpEmail(target, code)
+    auditOtpIssued(uid, target)
   } else {
     await sendOtpSms(target, code)
+    auditOtpIssued(uid, accountEmail, target)
   }
-
-  auditOtpIssued(uid, target)
 }
 
 /**

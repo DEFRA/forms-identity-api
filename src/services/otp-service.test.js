@@ -1,15 +1,25 @@
+import { audit } from '@defra/cdp-auditing'
+
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
 import { findOne } from '~/src/repositories/otps-repository.js'
 import { requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
 jest.mock('~/src/repositories/accounts-repository.js')
 jest.mock('~/src/repositories/otps-repository.js')
+jest.mock('~/src/lib/notify.js')
+jest.mock('@defra/cdp-auditing')
 
 describe('otp-service', () => {
   const uid = 'uid-1'
   const email = 'test-email@test.com'
   const accountId = 'acc-id'
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
   describe('requestOtp', () => {
     it('should throw if no account for purpose of ACCOUNT_', async () => {
       jest.mocked(findById).mockResolvedValueOnce(null)
@@ -36,6 +46,54 @@ describe('otp-service', () => {
           accountId
         )
       ).rejects.toThrow('Bad Request')
+    })
+
+    it('should create OTP for email', async () => {
+      await requestOtp(
+        uid,
+        'test-email@test.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.ACCOUNT_VERIFY_EMAIL,
+        undefined
+      )
+      expect(sendEmail).toHaveBeenCalledWith(
+        'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
+        'test-email@test.com',
+        { code: expect.any(String), expiry_minutes: 15 }
+      )
+      expect(audit).toHaveBeenCalledWith({
+        event: 'OtpIssued',
+        email: 'test-email@test.com',
+        uid: 'uid-1'
+      })
+    })
+
+    it('should create OTP for phone', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest
+        .mocked(findById)
+        .mockResolvedValueOnce({
+          phone: '+447507123456',
+          email: 'test-email@test.com'
+        })
+      await requestOtp(
+        uid,
+        '',
+        TRANSPORT.SMS,
+        PURPOSE.ACCOUNT_VERIFY_PHONE,
+        accountId
+      )
+      expect(sendSms).toHaveBeenCalledWith(
+        'ssssssss-ssss-ssss-ssss-ssssssssssss',
+        '+447507123456',
+        { code: expect.any(String), expiry_minutes: 15 }
+      )
+      expect(audit).toHaveBeenCalledWith({
+        event: 'OtpIssued',
+        email: 'test-email@test.com',
+        phone: '+447507123456',
+        uid: 'uid-1'
+      })
     })
   })
 

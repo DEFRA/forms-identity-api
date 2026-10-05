@@ -33,13 +33,6 @@ export function findOne(filter) {
 }
 
 /**
- * @param {Filter<OtpDocument>} filter
- */
-export function deleteMany(filter) {
-  return coll().deleteMany(filter)
-}
-
-/**
  * Upserts the record for a {uid, purpose} key — the unique index makes this
  * "one live code per authority per interaction" (resend overwrites)
  * @param {{ uid: string, purpose: string }} key

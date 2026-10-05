@@ -45,10 +45,15 @@ function auditAccountEvent(event, accountId, email, fields = {}) {
  * request, so a resend is its own event — the trail shows how many codes
  * went to an address and for which interaction.
  * @param {string} uid - the interaction the code belongs to
- * @param {string} email - the address the code was sent to
+ * @param {string} email - the address the code was sent to (or account email if sent to phone)
+ * @param {string} [phone] - the phone number the code was sent to
  */
-export function auditOtpIssued(uid, email) {
-  auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+export function auditOtpIssued(uid, email, phone) {
+  if (phone) {
+    auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid, phone })
+  } else {
+    auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+  }
 }
 
 /**

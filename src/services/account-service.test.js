@@ -1,9 +1,12 @@
+import { audit } from '@defra/cdp-auditing'
+
 import { findById } from '~/src/repositories/accounts-repository.js'
 import { findOne, update } from '~/src/repositories/otps-repository.js'
 import { updateEmail } from '~/src/services/account-service.js'
 
 jest.mock('~/src/repositories/accounts-repository.js')
 jest.mock('~/src/repositories/otps-repository.js')
+jest.mock('@defra/cdp-auditing')
 
 describe('account service', () => {
   const uid = 'uid-1'
@@ -61,5 +64,34 @@ describe('account service', () => {
       .mockResolvedValueOnce(validOtp)
     const res = await updateEmail(uid, id)
     expect(res).toEqual({ status: 'valid' })
+    expect(update).toHaveBeenCalledTimes(2)
+    expect(update).toHaveBeenNthCalledWith(
+      1,
+      {
+        accountId: 'acc-id',
+        consumed: false,
+        purpose: 'ACCOUNT_VERIFY_EMAIL',
+        uid: 'uid-1',
+        verified: true
+      },
+      { consumed: true }
+    )
+    expect(update).toHaveBeenNthCalledWith(
+      2,
+      {
+        accountId: 'acc-id',
+        consumed: false,
+        purpose: 'ACCOUNT_VERIFY_PHONE',
+        uid: 'uid-1',
+        verified: true
+      },
+      { consumed: true }
+    )
+    expect(audit).toHaveBeenCalledTimes(1)
+    expect(audit).toHaveBeenCalledWith({
+      event: 'EmailChanged',
+      accountId: undefined,
+      email: 'new-email@test.com'
+    })
   })
 })

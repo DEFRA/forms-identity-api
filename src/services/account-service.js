@@ -56,7 +56,7 @@ export async function updateEmail(uid, id) {
   const consumedEmail = await otpsRepository.update(filterEmailOtp, {
     consumed: true
   })
-  const consumedPhone = await otpsRepository.update(filterEmailOtp, {
+  const consumedPhone = await otpsRepository.update(filterPhoneOtp, {
     consumed: true
   })
 
