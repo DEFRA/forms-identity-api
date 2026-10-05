@@ -1,16 +1,18 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
+import argon2 from 'argon2'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
-import { findOne } from '~/src/repositories/otps-repository.js'
+import { findOne, update } from '~/src/repositories/otps-repository.js'
 import { requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
 jest.mock('~/src/repositories/accounts-repository.js')
 jest.mock('~/src/repositories/otps-repository.js')
 jest.mock('~/src/lib/notify.js')
 jest.mock('@defra/cdp-auditing')
+jest.mock('argon2')
 
 describe('otp-service', () => {
   const uid = 'uid-1'
@@ -130,6 +132,38 @@ describe('otp-service', () => {
         uid: 'uid-1',
         verified: false
       })
+    })
+
+    it('should verify only, not consume', async () => {
+      const createdAt = new Date()
+      const expireAt = new Date(createdAt.getTime() + 15 * 60 * 1000)
+      jest.mocked(findOne).mockResolvedValueOnce(
+        // @ts-expect-error - partial mock of test data
+        {
+          uid,
+          target: '+441911234567',
+          accountId,
+          createdAt,
+          expireAt,
+          attempts: 0
+        }
+      )
+      jest.mocked(findById).mockResolvedValueOnce(
+        // @ts-expect-error - partial mock of test data
+        {
+          phone: '+441911234567',
+          email: 'test-email@test.com'
+        }
+      )
+      jest.mocked(update).mockResolvedValueOnce(true)
+      jest.mocked(argon2.verify).mockResolvedValueOnce(true)
+      const res = await verifyOtp(
+        uid,
+        '123456',
+        PURPOSE.ACCOUNT_VERIFY_PHONE,
+        accountId
+      )
+      expect(res).toEqual({ status: 'valid' })
     })
   })
 })
