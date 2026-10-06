@@ -47,7 +47,8 @@ export async function insert(account) {
 }
 
 /**
- * Updates an account document
+ * Updates an account document; a duplicate email rejects on the unique
+ * index (see {@link isDuplicateKeyError})
  * @param {string} id
  * @param {Partial<AccountDocument>} fields
  */

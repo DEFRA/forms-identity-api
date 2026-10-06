@@ -60,10 +60,14 @@ export function auditOtpIssued(uid, email, phone) {
 /**
  * A user changed their email address (on their logged-in account)
  * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
- * @param {string} email - the new email address
+ * @param {string} oldEmail - the old email address
+ * @param {string} newEmail - the new email address
  */
-export function auditEmailChanged(accountId, email) {
-  auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, email, { email })
+export function auditEmailChanged(accountId, oldEmail, newEmail) {
+  auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, newEmail, {
+    oldEmail,
+    newEmail
+  })
 }
 
 /**

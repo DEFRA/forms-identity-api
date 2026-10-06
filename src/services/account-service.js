@@ -46,25 +46,36 @@ export async function updateEmail(uid, id) {
     return { status: STATUS.INVALID }
   }
 
+  const oldEmail = account.email
+
   /** @type {Partial<AccountDocument>} */
   const accountUpdate = {
     email: newEmail,
     updatedAt: new Date()
   }
-  await accountsRepository.update(id, accountUpdate)
 
-  const consumedEmail = await otpsRepository.update(filterEmailOtp, {
-    consumed: true
-  })
-  const consumedPhone = await otpsRepository.update(filterPhoneOtp, {
-    consumed: true
-  })
-
-  if (!consumedEmail || !consumedPhone) {
-    return { status: STATUS.INVALID } // a concurrent submit already completed
+  try {
+    await accountsRepository.update(id, accountUpdate)
+  } catch (err) {
+    if (accountsRepository.isDuplicateKeyError(err)) {
+      const existing = await accountsRepository.findByEmail(newEmail)
+      if (existing) {
+        return { status: STATUS.EMAIL_ALREADY_IN_USE }
+      }
+    }
+    throw err
   }
 
-  auditEmailChanged(account._id, newEmail)
+  // Consume the OTP records, but ignore if the 'consume' fails since
+  // they'll expire within 15 mins anyway, and the account record has already been changed
+  await otpsRepository.update(filterEmailOtp, {
+    consumed: true
+  })
+  await otpsRepository.update(filterPhoneOtp, {
+    consumed: true
+  })
+
+  auditEmailChanged(account._id, oldEmail, newEmail)
 
   return { status: STATUS.VALID }
 }

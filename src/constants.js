@@ -30,7 +30,7 @@ export const TRANSPORT = {
 
 /**
  * Sign-in service result statuses, returned to the route handlers.
- * @type {{ INVALID: 'invalid', INVALID_CODE_FORMAT: 'invalid-code-format', INVALID_CODE_CONSUMED_OR_EXPIRED: 'invalid-code-consumed-or-expired', PHONE_REQUIRED: 'phone-required', SIGNED_IN: 'signed-in', INVALID_PHONE: 'invalid-phone', OTP_ISSUED: 'otp-issued', LOCKED_OUT: 'locked-out', VALID: 'valid' }}
+ * @type {{ INVALID: 'invalid', INVALID_CODE_FORMAT: 'invalid-code-format', INVALID_CODE_CONSUMED_OR_EXPIRED: 'invalid-code-consumed-or-expired', PHONE_REQUIRED: 'phone-required', SIGNED_IN: 'signed-in', INVALID_PHONE: 'invalid-phone', OTP_ISSUED: 'otp-issued', LOCKED_OUT: 'locked-out', EMAIL_ALREADY_IN_USE: 'email-already-in-use', VALID: 'valid' }}
  */
 export const STATUS = {
   INVALID: 'invalid',
@@ -41,5 +41,6 @@ export const STATUS = {
   INVALID_PHONE: 'invalid-phone',
   OTP_ISSUED: 'otp-issued',
   LOCKED_OUT: 'locked-out',
+  EMAIL_ALREADY_IN_USE: 'email-already-in-use',
   VALID: 'valid'
 }

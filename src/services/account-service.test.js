@@ -54,9 +54,13 @@ describe('account service', () => {
 
   it('should return valid when successful', async () => {
     // @ts-expect-error - partial mock of test data
-    jest.mocked(findById).mockResolvedValueOnce({ status: 'active' })
+    jest
+      .mocked(findById)
+      .mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com'
+      })
     jest.mocked(update).mockResolvedValueOnce(true).mockResolvedValueOnce(true)
-    jest.mocked(findOne)
     jest
       .mocked(findOne)
       // @ts-expect-error - partial mock of test data
@@ -92,7 +96,9 @@ describe('account service', () => {
     expect(audit).toHaveBeenCalledWith({
       event: 'EmailChanged',
       accountId: undefined,
-      email: 'new-email@test.com'
+      email: 'new-email@test.com',
+      newEmail: 'new-email@test.com',
+      oldEmail: 'current-email@test.com'
     })
   })
 })
