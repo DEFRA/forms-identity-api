@@ -1,3 +1,8 @@
+import {
+  createLogContext,
+  getUserId,
+  runWithLogContext
+} from '@defra/forms-common'
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
@@ -558,6 +563,24 @@ describe('signin service', () => {
       expect(auditSignIn).toHaveBeenCalledTimes(1)
       expect(auditSignIn).toHaveBeenCalledWith('acc-1', 'a@b.com', 'uid-1')
       expect(auditRegistration).not.toHaveBeenCalled()
+    })
+
+    it('adds the account ID to the log context on sign-in', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(
+          /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
+        )
+      const code = await request('uid-1')
+
+      const userId = await runWithLogContext(createLogContext(), async () => {
+        await verifyOtp('uid-1', code)
+
+        return getUserId()
+      })
+
+      expect(userId).toBe('acc-1')
     })
 
     it('audits the sign in against the interaction it happened on', async () => {

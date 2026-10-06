@@ -39,6 +39,10 @@ updates:
         patterns:
           - '@types/*'
 
+      forms:
+        patterns:
+          - '@defra/forms-common'
+
       hapi:
         patterns:
           - '@hapi/*'
