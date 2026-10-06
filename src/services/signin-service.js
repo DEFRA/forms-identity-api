@@ -7,6 +7,7 @@ import { auditRegistration, auditSignIn } from '~/src/lib/audit.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
+import { clearRequestCount } from '~/src/services/otp-service.js'
 
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
@@ -39,6 +40,8 @@ export async function completeSignup(uid, phone) {
   }
 
   const account = await createAccount(doc.target, phoneNumber)
+
+  await clearRequestCount(doc.target)
 
   const consumed = await otpsRepository.update(filter, { consumed: true })
 
@@ -102,6 +105,7 @@ export async function findAccountById(id) {
 
 /**
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
+ * @typedef {{ status: 'otp-issued' } | { status: 'locked-out', lockedUntil: string }} RequestResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */

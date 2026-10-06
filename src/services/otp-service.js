@@ -3,10 +3,15 @@ import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
 import { PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
-import { auditOtpIssued, auditSignIn } from '~/src/lib/audit.js'
+import {
+  auditOtpIssued,
+  auditOtpLockout,
+  auditSignIn
+} from '~/src/lib/audit.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
+import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
@@ -14,12 +19,15 @@ const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
 const OTP_EXPIRY_MINUTES = Math.round(OTP_TTL_SECONDS / 60)
 const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
 const OTP_NOTIFY_SMS_TEMPLATE_ID = config.get('otp.notify.smsTemplateId')
+const LOCKOUT_MAX_REQUESTS = config.get('otp.lockout.maxRequests')
+const LOCKOUT_WINDOW_MS = config.get('otp.lockout.windowSeconds') * 1000
+const LOCKOUT_MS = config.get('otp.lockout.durationSeconds') * 1000
 
 /**
  * @typedef {{ codeHash: string, uid: string, purpose: PurposeType, verified: boolean, consumed: boolean, accountId?: string }} ClaimType
  */
 
-// Every OTP operation filters on {uid, purpose} — never uid alone — so codes
+// Every OTP operation filters on {uid, purpose, and possibly accountId} — never uid alone — so codes
 // are isolated per interaction and per purpose.
 
 /**
@@ -41,6 +49,18 @@ export async function requestOtp(
 ) {
   let target = email?.toLowerCase()
   let accountEmail = ''
+
+  if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL && target) {
+    const lockedUntil = await claimOtpRequest(uid, target)
+
+    if (lockedUntil) {
+      return {
+        status: STATUS.LOCKED_OUT,
+        lockedUntil: lockedUntil.toISOString()
+      }
+    }
+  }
+
   if (accountId) {
     // Verify account exists
     const account = await accountsRepository.findById(accountId)
@@ -84,6 +104,108 @@ export async function requestOtp(
     await sendOtpSms(target, code)
     auditOtpIssued(uid, accountEmail, target)
   }
+
+  return { status: STATUS.OTP_ISSUED }
+}
+
+/**
+ * Counts this request against the address's rolling window and reports when
+ * the address may next ask for a code, or null when this request is allowed.
+ *
+ * The counter is keyed on the address alone, not on the interaction, so
+ * starting a fresh interaction for every request does not buy a fresh count.
+ * @param {string} uid
+ * @param {string} target - lowercased email
+ * @returns {Promise<Date | null>} when the lockout lifts, or null if not locked out
+ */
+async function claimOtpRequest(uid, target) {
+  const now = new Date()
+  const key = { target }
+  const existing = await otpLockoutsRepository.findOne(key)
+
+  // The address is locked. Refuse the request and leave the record as it
+  // is, so that requests during a lockout keep the same unlock time
+  if (existing?.lockedUntil && existing.lockedUntil.getTime() > now.getTime()) {
+    return existing.lockedUntil
+  }
+
+  if (existing && hasWindowElapsed(existing, now)) {
+    // The record is from a window or a lockout that has ended. Start a new
+    // window: set the count to zero and clear the old lock. Without this
+    // step, the old count stays and this request is refused.
+    //
+    // The filter includes the windowStartedAt value that was read, so that
+    // only one of several concurrent requests does the reset. The others
+    // match nothing and their counts are added to the new window.
+    await otpLockoutsRepository.update(
+      { ...key, windowStartedAt: existing.windowStartedAt },
+      { windowStartedAt: now, requests: 0, lockedUntil: null }
+    )
+  }
+
+  // Count this request. The first request for an address creates the
+  // record. Each request moves expireAt forward, so that Mongo deletes the
+  // record only after the window and a possible lockout have both ended.
+  const counter = await otpLockoutsRepository.incrementRequests(
+    key,
+    { expireAt: new Date(now.getTime() + LOCKOUT_WINDOW_MS + LOCKOUT_MS) },
+    { windowStartedAt: now, lockedUntil: null }
+  )
+
+  if (counter.requests <= LOCKOUT_MAX_REQUESTS) {
+    // The count is in the limit: permit the request.
+    return null
+  }
+
+  // The count is above the limit: lock the address. The filter matches
+  // only a record that has no lock, so that one of several concurrent
+  // requests sets the lock and writes the audit record. The others are
+  // refused with no second audit record.
+  const lockedUntil = new Date(now.getTime() + LOCKOUT_MS)
+
+  const locked = await otpLockoutsRepository.update(
+    { ...key, lockedUntil: null },
+    { lockedUntil }
+  )
+
+  if (locked) {
+    auditOtpLockout(uid, target, lockedUntil)
+  }
+
+  return lockedUntil
+}
+
+/**
+ * Whether the counter that was just read belongs to a window that is over,
+ * so this request starts a new count.
+ *
+ * A lockout ends its own window: once it lifts the address gets a clean
+ * count, otherwise the requests that caused it would lock it again at once.
+ *
+ * Mongo TTL is lazy and isn't evaluated in real time, so the window is
+ * checked in-app rather than trusted to have been swept away.
+ * @param {OtpLockoutDocument} counter
+ * @param {Date} now
+ */
+function hasWindowElapsed(counter, now) {
+  if (counter.lockedUntil) {
+    return counter.lockedUntil.getTime() <= now.getTime()
+  }
+
+  return counter.windowStartedAt.getTime() + LOCKOUT_WINDOW_MS <= now.getTime()
+}
+
+/**
+ * Puts the code request count for an address back to zero, so the next
+ * sign-in starts with a full budget.
+ *
+ * A completed sign-in proves the codes were reaching the person who owns the
+ * address, so the count they ran up getting in should not follow them into
+ * their next sign-in.
+ * @param {string} target - lowercased email
+ */
+export function clearRequestCount(target) {
+  return otpLockoutsRepository.clear({ target })
 }
 
 /**
@@ -203,6 +325,11 @@ async function handleWhenAccountExists(
   failResult
 ) {
   if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL) {
+    // A successful sign-in shows that the user owns the address, so set the
+    // OTP request count back to zero. The next sign-in then starts with the
+    // full number of requests.
+    await clearRequestCount(account.email)
+
     const consumed = await otpsRepository.update(claim, { consumed: true })
 
     if (!consumed) {
@@ -293,6 +420,7 @@ export async function findOtp(uid, purpose) {
 /**
  * @import { Filter, WithId } from 'mongodb'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
+ * @import { OtpLockoutDocument } from '~/src/repositories/otp-lockouts-repository.js'
  * @import { PurposeType } from '~/src/constants.js'
  * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string } | { status: 'valid' }} VerifyResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult

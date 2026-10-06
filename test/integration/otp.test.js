@@ -25,7 +25,7 @@ describe('OTP endpoints', () => {
         payload: { uid: 'uid-1', target: 'a@b.com' }
       })
 
-      expect(res.statusCode).toBe(204)
+      expect(res.statusCode).toBe(200)
       expect(sendEmail).toHaveBeenCalledWith(
         'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
         'a@b.com',
@@ -48,7 +48,7 @@ describe('OTP endpoints', () => {
         }
       })
 
-      expect(res.statusCode).toBe(204)
+      expect(res.statusCode).toBe(200)
       expect(sendSms).toHaveBeenCalledWith(
         'ssssssss-ssss-ssss-ssss-ssssssssssss',
         '+447507123456',

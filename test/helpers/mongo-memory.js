@@ -4,13 +4,6 @@ import { config } from '~/src/config/index.js'
 import { client, prepareDb } from '~/src/mongo.js'
 
 /**
- * The platform runs MongoDB 6.0 (see the CDP compose files), so integration
- * tests exercise the same major version. Keep this in step with the CI cache
- * key in .github/workflows/check-pull-request.yml.
- */
-export const MONGO_VERSION = '6.0.14'
-
-/**
  * Booting mongod can include downloading the binary on a cold cache, which is
  * far slower than jest's default timeout allows for.
  */
@@ -22,11 +15,15 @@ export const MONGO_BOOT_TIMEOUT_MS = 180_000
  * genuine Mongo semantics: unique indexes, atomic filtered updates and
  * duplicate-key errors. Callers own the lifecycle — stop() it in afterAll,
  * alongside closing the app's Mongo client.
+ *
+ * The mongod version comes from config.mongodbMemoryServer.version in
+ * package.json, which mongodb-memory-server reads itself. The platform runs
+ * MongoDB 6.0 (see the CDP compose files), so integration tests exercise the
+ * same major version. CI reads the same value to choose the mongo image it
+ * copies the binary from, so there is only one place to change it.
  */
 export async function startMongoMemoryServer() {
-  const mongod = await MongoMemoryServer.create({
-    binary: { version: MONGO_VERSION }
-  })
+  const mongod = await MongoMemoryServer.create()
 
   config.set('mongo.uri', mongod.getUri())
 

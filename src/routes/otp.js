@@ -1,5 +1,4 @@
 import Boom from '@hapi/boom'
-import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
@@ -40,7 +39,7 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
-    async handler(request, h) {
+    handler(request) {
       const { uid, transport, purpose, accountId, target } =
         /** @type {{ uid: string, transport: TransportType, purpose: PurposeType, accountId?: string, target: string }} */ (
           request.payload
@@ -64,8 +63,7 @@ export default /** @type {ServerRoute[]} */ ([
       ) {
         throw Boom.badRequest()
       }
-      await requestOtp(uid, target, transport, purpose, accountId)
-      return h.response().code(StatusCodes.NO_CONTENT)
+      return requestOtp(uid, target, transport, purpose, accountId)
     }
   },
   {
