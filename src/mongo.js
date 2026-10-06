@@ -7,6 +7,7 @@ const isSecureContextEnabled = config.get('isSecureContextEnabled')
 
 export const ACCOUNTS_COLLECTION_NAME = 'accounts'
 export const OTPS_COLLECTION_NAME = 'otps'
+export const OTP_LOCKOUTS_COLLECTION_NAME = 'otp-lockouts'
 
 /**
  * oidc-provider artifact collections (one snake_cased collection per model,
@@ -100,6 +101,13 @@ export async function createIndexes(database) {
     .createIndex({ uid: 1, purpose: 1 }, { unique: true })
   await database
     .collection(OTPS_COLLECTION_NAME)
+    .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
+
+  await database
+    .collection(OTP_LOCKOUTS_COLLECTION_NAME)
+    .createIndex({ target: 1 }, { unique: true })
+  await database
+    .collection(OTP_LOCKOUTS_COLLECTION_NAME)
     .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
 
   for (const name of OIDC_COLLECTION_NAMES) {

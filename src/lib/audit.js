@@ -7,6 +7,7 @@ import { audit } from '@defra/cdp-auditing'
  */
 export const AUDIT_EVENT = {
   OTP_ISSUED: 'OtpIssued',
+  OTP_LOCKED_OUT: 'OtpLockedOut',
   SIGN_IN: 'SignIn',
   SIGN_OUT: 'SignOut',
   REGISTRATION: 'Registration'
@@ -48,6 +49,22 @@ function auditAccountEvent(event, accountId, email, fields = {}) {
  */
 export function auditOtpIssued(uid, email) {
   auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+}
+
+/**
+ * An email address asked for more codes than the limit allows and is now
+ * locked out. Recorded once, when the lockout starts: the requests refused
+ * while it holds leave no OtpIssued record, so the trail reads as the
+ * lockout followed by silence.
+ * @param {string} uid - the interaction the limit was reached on
+ * @param {string} email - the address that is locked out
+ * @param {Date} lockedUntil - when the address may request a code again
+ */
+export function auditOtpLockout(uid, email, lockedUntil) {
+  auditEvent(AUDIT_EVENT.OTP_LOCKED_OUT, email, {
+    uid,
+    lockedUntil: lockedUntil.toISOString()
+  })
 }
 
 /**

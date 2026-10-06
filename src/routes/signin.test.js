@@ -27,7 +27,7 @@ async function buildServer() {
 
 describe('signin routes', () => {
   it('POST /otp/request validates and delegates', async () => {
-    jest.mocked(requestOtp).mockResolvedValue(undefined)
+    jest.mocked(requestOtp).mockResolvedValue({ status: 'otp-issued' })
     const server = await buildServer()
 
     const res = await server.inject({
@@ -36,8 +36,29 @@ describe('signin routes', () => {
       payload: { uid: 'uid-1', email: 'a@b.com' }
     })
 
-    expect(res.statusCode).toBe(204)
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({ status: 'otp-issued' })
     expect(requestOtp).toHaveBeenCalledWith('uid-1', 'a@b.com')
+  })
+
+  it('POST /otp/request passes a lockout through with the unlock time', async () => {
+    jest.mocked(requestOtp).mockResolvedValue({
+      status: 'locked-out',
+      lockedUntil: '2026-09-11T12:00:00.000Z'
+    })
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/otp/request',
+      payload: { uid: 'uid-1', email: 'a@b.com' }
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({
+      status: 'locked-out',
+      lockedUntil: '2026-09-11T12:00:00.000Z'
+    })
   })
 
   it('POST /otp/request surfaces a delivery failure as a 500', async () => {
