@@ -54,12 +54,10 @@ describe('account service', () => {
 
   it('should return valid when successful', async () => {
     // @ts-expect-error - partial mock of test data
-    jest
-      .mocked(findById)
-      .mockResolvedValueOnce({
-        status: 'active',
-        email: 'current-email@test.com'
-      })
+    jest.mocked(findById).mockResolvedValueOnce({
+      status: 'active',
+      email: 'current-email@test.com'
+    })
     jest.mocked(update).mockResolvedValueOnce(true).mockResolvedValueOnce(true)
     jest
       .mocked(findOne)
