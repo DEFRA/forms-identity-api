@@ -341,10 +341,9 @@ async function handleWhenAccountExists(
   }
 
   // PURPOSE.ACCOUNT_VERIFY_EMAIL or PURPOSE.ACCOUNT_VERIFY_PHONE
-  const now = new Date()
   const verifiedOtp = await otpsRepository.update(claim, {
     verified: true,
-    expireAt: new Date(now.getTime() + LOCKOUT_WINDOW_MS + LOCKOUT_MS)
+    expireAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000)
   })
 
   if (!verifiedOtp) {
