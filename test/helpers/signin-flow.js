@@ -107,7 +107,7 @@ export function setupSigninFlow() {
     return inject({
       method: 'POST',
       url: '/otp/request',
-      payload: { uid, email }
+      payload: { uid, target: email }
     })
   }
 

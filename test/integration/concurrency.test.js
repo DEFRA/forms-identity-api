@@ -31,7 +31,7 @@ describe('concurrency', () => {
         inject({
           method: 'POST',
           url: '/otp/request',
-          payload: { uid: 'uid-race', email: 'citizen@example.com' }
+          payload: { uid: 'uid-race', target: 'citizen@example.com' }
         })
       )
     )
@@ -56,7 +56,7 @@ describe('concurrency', () => {
         inject({
           method: 'POST',
           url: '/otp/request',
-          payload: { uid: `uid-burst-${i}`, email: 'burst@example.com' }
+          payload: { uid: `uid-burst-${i}`, target: 'burst@example.com' }
         })
       )
     )

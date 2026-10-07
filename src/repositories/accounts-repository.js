@@ -47,5 +47,15 @@ export async function insert(account) {
 }
 
 /**
+ * Updates an account document; a duplicate email rejects on the unique
+ * index (see {@link isDuplicateKeyError})
+ * @param {string} id
+ * @param {Partial<AccountDocument>} fields
+ */
+export async function update(id, fields) {
+  await coll().updateOne({ _id: id }, { $set: fields })
+}
+
+/**
  * @import { Collection } from 'mongodb'
  */

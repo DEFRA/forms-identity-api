@@ -58,7 +58,11 @@ describe('citizen sign-in journeys', () => {
     const code = await requestCode('uid-signup', 'Citizen@Example.com')
 
     const shown = await inject({ method: 'GET', url: '/otp/uid-signup' })
-    expect(JSON.parse(shown.payload)).toEqual({ email: 'citizen@example.com' })
+    expect(JSON.parse(shown.payload)).toEqual({
+      consumed: false,
+      verified: false,
+      target: 'citizen@example.com'
+    })
 
     for (let i = 0; i < 4; i++) {
       expect(await verify('uid-signup', '000000')).toEqual({
@@ -83,7 +87,8 @@ describe('citizen sign-in journeys', () => {
     })
     expect(JSON.parse(claims.payload)).toEqual({
       id: accountId,
-      email: 'citizen@example.com'
+      email: 'citizen@example.com',
+      phone: '+447911123456'
     })
 
     const stored = await db

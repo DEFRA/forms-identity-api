@@ -1,7 +1,7 @@
 import { token } from '@hapi/jwt'
 
 import { postJson } from '~/src/lib/fetch.js'
-import { sendEmail } from '~/src/lib/notify.js'
+import { sendEmail, sendSms } from '~/src/lib/notify.js'
 
 jest.mock('~/src/lib/fetch.js')
 
@@ -32,6 +32,39 @@ describe('notify client', () => {
       // a configured reply-to makes the mail more likely to reach an inbox
       // rather than a spam folder
       email_reply_to_id: process.env.NOTIFY_REPLY_TO_ID
+    })
+    const auth = options.headers.Authorization
+    expect(auth).toMatch(/^Bearer /)
+
+    const artifacts = token.decode(auth.replace('Bearer ', ''))
+    expect(artifacts.decoded.payload.iss).toBe(SERVICE_ID)
+    // signed with the key id (the trailing uuid), per the Notify API contract
+    expect(() => {
+      token.verifySignature(artifacts, { key: API_KEY_ID, algorithm: 'HS256' })
+    }).not.toThrow()
+    expect(() => {
+      token.verifySignature(artifacts, { key: SERVICE_ID, algorithm: 'HS256' })
+    }).toThrow()
+  })
+
+  it('posts an SMS to Notify with a bearer JWT', async () => {
+    await sendSms('template-sms', '07507123456', {
+      code: '123456',
+      expiry_minutes: 15
+    })
+
+    expect(postJson).toHaveBeenCalledTimes(1)
+    const [url, options] =
+      /** @type {[URL, { payload: object, headers: Record<string, string> }]} */ (
+        jest.mocked(postJson).mock.calls[0]
+      )
+    expect(url.href).toBe(
+      'https://api.notifications.service.gov.uk/v2/notifications/sms'
+    )
+    expect(options.payload).toEqual({
+      template_id: 'template-sms',
+      phone_number: '07507123456',
+      personalisation: { code: '123456', expiry_minutes: 15 }
     })
     const auth = options.headers.Authorization
     expect(auth).toMatch(/^Bearer /)

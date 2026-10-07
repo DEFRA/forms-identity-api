@@ -6,6 +6,7 @@ import { audit } from '@defra/cdp-auditing'
  * record, so downstream consumers can filter on it.
  */
 export const AUDIT_EVENT = {
+  EMAIL_CHANGED: 'EmailChanged',
   OTP_ISSUED: 'OtpIssued',
   OTP_LOCKED_OUT: 'OtpLockedOut',
   SIGN_IN: 'SignIn',
@@ -45,10 +46,28 @@ function auditAccountEvent(event, accountId, email, fields = {}) {
  * request, so a resend is its own event — the trail shows how many codes
  * went to an address and for which interaction.
  * @param {string} uid - the interaction the code belongs to
- * @param {string} email - the address the code was sent to
+ * @param {string} email - the address the code was sent to (or account email if sent to phone)
+ * @param {string} [phone] - the phone number the code was sent to
  */
-export function auditOtpIssued(uid, email) {
-  auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+export function auditOtpIssued(uid, email, phone) {
+  if (phone) {
+    auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid, phone })
+  } else {
+    auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+  }
+}
+
+/**
+ * A user changed their email address (on their logged-in account)
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} oldEmail - the old email address
+ * @param {string} newEmail - the new email address
+ */
+export function auditEmailChanged(accountId, oldEmail, newEmail) {
+  auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, newEmail, {
+    oldEmail,
+    newEmail
+  })
 }
 
 /**
