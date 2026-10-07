@@ -48,6 +48,10 @@ export async function updateEmail(uid, id) {
 
   const oldEmail = account.email
 
+  if (oldEmail === newEmail) {
+    return { status: STATUS.EMAIL_SAME_AS_CURRENT }
+  }
+
   /** @type {Partial<AccountDocument>} */
   const accountUpdate = {
     email: newEmail,
