@@ -6,8 +6,6 @@ import { config } from '~/src/config/index.js'
 
 export const TEST_OTP_SECRET = 'test-otp-secret'
 
-const BEARER_PREFIX = 'Bearer '
-
 /**
  * @param {string} value
  */
@@ -28,8 +26,7 @@ export const testOtpSecret = {
     name: TEST_OTP_SECRET,
     register(server) {
       const secret = config.get('otp.testRead.secret')
-
-      const expected = secret ? digest(secret) : undefined
+      const expected = digest(`Bearer ${secret}`)
 
       server.auth.scheme(TEST_OTP_SECRET, () => ({
         /**
@@ -37,22 +34,12 @@ export const testOtpSecret = {
          * @param {ResponseToolkit} h
          */
         authenticate(request, h) {
-          const header = request.headers.authorization
-
-          if (
-            !expected ||
-            typeof header !== 'string' ||
-            !header.startsWith(BEARER_PREFIX)
-          ) {
-            throw Boom.unauthorized(null, 'Bearer')
-          }
-
           // Both values are hashed first. The digests have the same length,
           // which timingSafeEqual needs, and the time the comparison takes
           // tells a caller nothing about the secret.
-          const sent = digest(header.slice(BEARER_PREFIX.length))
+          const sent = digest(String(request.headers.authorization))
 
-          if (!timingSafeEqual(sent, expected)) {
+          if (!secret || !timingSafeEqual(sent, expected)) {
             throw Boom.unauthorized(null, 'Bearer')
           }
 
