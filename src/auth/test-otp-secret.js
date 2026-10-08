@@ -6,7 +6,6 @@ import { config } from '~/src/config/index.js'
 
 export const TEST_OTP_SECRET = 'test-otp-secret'
 
-const MIN_SECRET_LENGTH = 32
 const BEARER_PREFIX = 'Bearer '
 
 /**
@@ -20,8 +19,8 @@ function digest(value) {
  * Checks the shared secret that an automated test sends to read a sign-in
  * code. The test and this service hold the same value.
  *
- * A secret is valid when it has 32 characters or more. A deployment with a
- * shorter value, or with no value, refuses every caller.
+ * A deployment with no secret refuses every caller, so that an empty token
+ * is not a match for an empty secret.
  * @satisfies {ServerRegisterPluginObject<void>}
  */
 export const testOtpSecret = {
@@ -30,8 +29,7 @@ export const testOtpSecret = {
     register(server) {
       const secret = config.get('otp.testRead.secret')
 
-      const expected =
-        secret.length >= MIN_SECRET_LENGTH ? digest(secret) : undefined
+      const expected = secret ? digest(secret) : undefined
 
       server.auth.scheme(TEST_OTP_SECRET, () => ({
         /**

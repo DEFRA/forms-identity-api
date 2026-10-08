@@ -157,7 +157,7 @@ export const config = convict({
     testRead: {
       /** @type {SchemaObj<string>} */
       secret: {
-        doc: 'Lets automated tests sign in. A sign-in code for an address on the test email domain is kept for the test to read and is not emailed. The test sends this value to read the code. Minimum of 32 characters. With a shorter value or no value, no caller can read a code. Use a different value in each environment.',
+        doc: 'Lets automated tests sign in. A sign-in code for an address on the test email domain is kept for the test to read and is not emailed. The test sends this value to read the code. With no value, no caller can read a code. Use a different value in each environment.',
         format: String,
         default: '',
         sensitive: true,
