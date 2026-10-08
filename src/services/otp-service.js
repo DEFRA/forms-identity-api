@@ -138,7 +138,7 @@ export async function requestOtp(
     if (isKeptForTest(purpose, transportType, target)) {
       // A test address has no mailbox. The code is kept for the test to
       // read, and Notify is not called.
-      await keepTestOtp(uid, target, code, expireAt)
+      await keepTestOtp(target, code, expireAt)
     } else {
       await sendOtpEmail(target, code)
     }

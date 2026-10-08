@@ -113,7 +113,7 @@ export async function createIndexes(database) {
 
   await database
     .collection(TEST_OTPS_COLLECTION_NAME)
-    .createIndex({ uid: 1, purpose: 1 }, { unique: true })
+    .createIndex({ target: 1 }, { unique: true })
   await database
     .collection(TEST_OTPS_COLLECTION_NAME)
     .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })

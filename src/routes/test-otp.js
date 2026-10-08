@@ -12,24 +12,23 @@ import { findTestOtp } from '~/src/services/test-otp-service.js'
 export default /** @type {ServerRoute[]} */ (
   /** @type {unknown[]} */ ([
     /**
-     * The sign-in code for an interaction, in plain text. `uid` is the value
-     * that forms-identity-ui sends on /otp/request: the SHA-256 of the
-     * interaction uid, as base64url.
-     * @type {ServerRoute<{ Params: { uid: string } }>}
+     * The newest sign-in code for a test address, in plain text. The test
+     * knows the address it signs in with, so it reads the code by address.
+     * @type {ServerRoute<{ Params: { email: string } }>}
      */
     ({
       method: 'GET',
-      path: '/test/otp/{uid}',
+      path: '/test/otp/{email}',
       options: {
         auth: TEST_OTP_SECRET,
         validate: {
           params: Joi.object({
-            uid: Joi.string().required()
+            email: Joi.string().required()
           })
         }
       },
       handler(request) {
-        return findTestOtp(request.params.uid)
+        return findTestOtp(request.params.email)
       }
     })
   ])

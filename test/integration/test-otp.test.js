@@ -16,13 +16,13 @@ const { inject, injectWithoutToken, requestCodeResponse, verify } =
 
 /**
  * Reads the kept code as a test does, with the secret as the bearer token
- * @param {string} uid
+ * @param {string} email
  * @param {string} [secret]
  */
-const readCode = (uid, secret = SECRET) =>
+const readCode = (email, secret = SECRET) =>
   injectWithoutToken({
     method: 'GET',
-    url: `/test/otp/${uid}`,
+    url: `/test/otp/${email}`,
     headers: { authorization: `Bearer ${secret}` }
   })
 
@@ -40,7 +40,7 @@ describe('sign-in for automated tests', () => {
     expect(JSON.parse(requested.payload)).toEqual({ status: 'otp-issued' })
     expect(sendEmail).not.toHaveBeenCalled()
 
-    const read = await readCode('uid-test')
+    const read = await readCode(TEST_ADDRESS)
 
     expect(read.statusCode).toBe(200)
 
@@ -58,7 +58,7 @@ describe('sign-in for automated tests', () => {
 
     expect(await keptCodes()).toHaveLength(1)
 
-    const { code } = JSON.parse((await readCode('uid-resend')).payload)
+    const { code } = JSON.parse((await readCode(TEST_ADDRESS)).payload)
 
     expect(await verify('uid-resend', code)).toEqual({
       status: 'phone-required'
@@ -74,11 +74,19 @@ describe('sign-in for automated tests', () => {
 
     expect(sendEmail).toHaveBeenCalledTimes(1)
     expect(await keptCodes()).toEqual([])
-    expect((await readCode('uid-real')).statusCode).toBe(404)
+    expect((await readCode(email)).statusCode).toBe(404)
   })
 
-  it('answers 404 for an interaction with no code', async () => {
-    expect((await readCode('uid-unknown')).statusCode).toBe(404)
+  it('answers 404 for an address with no code', async () => {
+    expect((await readCode(TEST_ADDRESS)).statusCode).toBe(404)
+  })
+
+  it('reads the code for an address in another letter case', async () => {
+    await requestCodeResponse('uid-case', TEST_ADDRESS)
+
+    const read = await readCode('Perf-1@Example.Forms.Defra.Gov.UK')
+
+    expect(read.statusCode).toBe(200)
   })
 
   it('answers 404 for a code that is out of date', async () => {
@@ -86,17 +94,17 @@ describe('sign-in for automated tests', () => {
     await db
       .collection(TEST_OTPS_COLLECTION_NAME)
       .updateOne(
-        { uid: 'uid-expired' },
+        { target: TEST_ADDRESS },
         { $set: { expireAt: new Date(Date.now() - 1000) } }
       )
 
-    expect((await readCode('uid-expired')).statusCode).toBe(404)
+    expect((await readCode(TEST_ADDRESS)).statusCode).toBe(404)
   })
 
   it('refuses a caller with a different secret', async () => {
     await requestCodeResponse('uid-wrong', TEST_ADDRESS)
 
-    const res = await readCode('uid-wrong', 'b'.repeat(32))
+    const res = await readCode(TEST_ADDRESS, 'b'.repeat(32))
 
     expect(res.statusCode).toBe(401)
   })
@@ -104,14 +112,17 @@ describe('sign-in for automated tests', () => {
   it('refuses a caller with no secret', async () => {
     const res = await injectWithoutToken({
       method: 'GET',
-      url: '/test/otp/uid-test'
+      url: `/test/otp/${TEST_ADDRESS}`
     })
 
     expect(res.statusCode).toBe(401)
   })
 
   it('refuses the forms-identity-ui token on the test route', async () => {
-    const res = await inject({ method: 'GET', url: '/test/otp/uid-test' })
+    const res = await inject({
+      method: 'GET',
+      url: `/test/otp/${TEST_ADDRESS}`
+    })
 
     expect(res.statusCode).toBe(401)
   })

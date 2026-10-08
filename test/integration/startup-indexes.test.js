@@ -27,9 +27,9 @@ describe('startup indexes', () => {
     )
   })
 
-  it('keeps one test code per {uid, purpose}', async () => {
+  it('keeps one test code per address', async () => {
     expect(await indexesOf(TEST_OTPS_COLLECTION_NAME)).toContainEqual(
-      expect.objectContaining({ key: { uid: 1, purpose: 1 }, unique: true })
+      expect.objectContaining({ key: { target: 1 }, unique: true })
     )
   })
 

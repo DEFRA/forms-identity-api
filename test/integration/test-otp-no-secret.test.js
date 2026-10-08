@@ -16,7 +16,7 @@ describe('sign-in for automated tests, with no test secret', () => {
 
     const res = await injectWithoutToken({
       method: 'GET',
-      url: '/test/otp/uid-no-secret',
+      url: `/test/otp/${TEST_ADDRESS}`,
       headers: { authorization: `Bearer ${secret}` }
     })
 

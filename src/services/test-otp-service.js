@@ -33,33 +33,26 @@ export function isKeptForTest(purpose, transport, target) {
 /**
  * Keeps a sign-in code in plain text for a test to read. The record is in
  * its own collection, so that the otps collection holds hashes only.
- * @param {string} uid
  * @param {string} target - lowercased test email
  * @param {string} code
  * @param {Date} expireAt - the same expiry as the code
  */
-export function keepTestOtp(uid, target, code, expireAt) {
-  return testOtpsRepository.upsert(
-    { uid, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
-    { target, code, expireAt }
-  )
+export function keepTestOtp(target, code, expireAt) {
+  return testOtpsRepository.upsert(target, { code, expireAt })
 }
 
 /**
- * The sign-in code that was kept for an interaction.
+ * The newest sign-in code that was kept for a test address.
  *
  * Mongo TTL is lazy, so the expiry is also checked here.
- * @param {string} uid
+ * @param {string} email
  * @throws {Boom.Boom} notFound when there is no code that is still in date
  */
-export async function findTestOtp(uid) {
-  const doc = await testOtpsRepository.findOne({
-    uid,
-    purpose: PURPOSE.SIGNIN_VERIFY_EMAIL
-  })
+export async function findTestOtp(email) {
+  const doc = await testOtpsRepository.findOne({ target: email.toLowerCase() })
 
   if (!doc || doc.expireAt.getTime() < Date.now()) {
-    throw Boom.notFound('No test code for this interaction')
+    throw Boom.notFound('No test code for this address')
   }
 
   return { code: doc.code }
