@@ -44,7 +44,7 @@ describe('OTP endpoints', () => {
           uid: 'uid-1',
           transport: TRANSPORT.SMS,
           accountId: 'acc-1',
-          purpose: PURPOSE.ACCOUNT_VERIFY_PHONE
+          purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
         }
       })
 

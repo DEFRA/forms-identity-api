@@ -31,7 +31,7 @@ describe('otp-service', () => {
           uid,
           email,
           TRANSPORT.EMAIL,
-          PURPOSE.ACCOUNT_VERIFY_EMAIL,
+          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
           accountId
         )
       ).rejects.toThrow('Bad Request')
@@ -45,7 +45,7 @@ describe('otp-service', () => {
           uid,
           '',
           TRANSPORT.EMAIL,
-          PURPOSE.ACCOUNT_VERIFY_EMAIL,
+          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
           accountId
         )
       ).rejects.toThrow('Bad Request')
@@ -56,7 +56,7 @@ describe('otp-service', () => {
         uid,
         'test-email@test.com',
         TRANSPORT.EMAIL,
-        PURPOSE.ACCOUNT_VERIFY_EMAIL,
+        PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
         undefined
       )
       expect(sendEmail).toHaveBeenCalledWith(
@@ -83,7 +83,7 @@ describe('otp-service', () => {
         uid,
         '',
         TRANSPORT.SMS,
-        PURPOSE.ACCOUNT_VERIFY_PHONE,
+        PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
         accountId
       )
       expect(sendSms).toHaveBeenCalledWith(
@@ -105,14 +105,14 @@ describe('otp-service', () => {
       const res = await verifyOtp(
         uid,
         '123456',
-        PURPOSE.ACCOUNT_VERIFY_EMAIL,
+        PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
         accountId
       )
       expect(res).toEqual({ status: 'invalid-code-consumed-or-expired' })
       expect(findOne).toHaveBeenCalledWith({
         accountId: 'acc-id',
         consumed: false,
-        purpose: 'ACCOUNT_VERIFY_EMAIL',
+        purpose: 'ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL',
         uid: 'uid-1',
         verified: false
       })
@@ -160,7 +160,7 @@ describe('otp-service', () => {
       const res = await verifyOtp(
         uid,
         '123456',
-        PURPOSE.ACCOUNT_VERIFY_PHONE,
+        PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
         accountId
       )
       expect(res).toEqual({ status: 'valid' })

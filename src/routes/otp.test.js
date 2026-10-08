@@ -43,7 +43,7 @@ describe('otp routes', () => {
         url: '/otp/request',
         payload: {
           uid: 'uid-1',
-          purpose: PURPOSE.ACCOUNT_VERIFY_EMAIL,
+          purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
           transport: TRANSPORT.SMS
         }
       })
@@ -60,7 +60,7 @@ describe('otp routes', () => {
         url: '/otp/request',
         payload: {
           uid: 'uid-1',
-          purpose: PURPOSE.ACCOUNT_VERIFY_PHONE,
+          purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
           transport: TRANSPORT.EMAIL,
           target: 'test@email.com'
         }

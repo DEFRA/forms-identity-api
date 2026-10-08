@@ -3,12 +3,13 @@
  * JOURNEY_CHALLENGE form, so it captures both the journey and the challenge
  * together (see the spec's purpose naming rule). Codes are isolated per
  * {uid, purpose}, so each new challenge gets its own entry.
- * @type {{ SIGNIN_VERIFY_EMAIL: 'SIGNIN_VERIFY_EMAIL', ACCOUNT_VERIFY_PHONE: 'ACCOUNT_VERIFY_PHONE', ACCOUNT_VERIFY_EMAIL: 'ACCOUNT_VERIFY_EMAIL' }}
+ * @type {{ SIGNIN_VERIFY_EMAIL: 'SIGNIN_VERIFY_EMAIL', ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE: 'ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE',   ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL: 'ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL', ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL: 'ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL'}}
  */
 export const PURPOSE = {
   SIGNIN_VERIFY_EMAIL: 'SIGNIN_VERIFY_EMAIL',
-  ACCOUNT_VERIFY_PHONE: 'ACCOUNT_VERIFY_PHONE',
-  ACCOUNT_VERIFY_EMAIL: 'ACCOUNT_VERIFY_EMAIL'
+  ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE: 'ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE',
+  ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL: 'ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL',
+  ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL: 'ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL'
 }
 
 /**
@@ -30,7 +31,7 @@ export const TRANSPORT = {
 
 /**
  * Sign-in service result statuses, returned to the route handlers.
- * @type {{ INVALID: 'invalid', INVALID_CODE_FORMAT: 'invalid-code-format', INVALID_CODE_CONSUMED_OR_EXPIRED: 'invalid-code-consumed-or-expired', PHONE_REQUIRED: 'phone-required', SIGNED_IN: 'signed-in', INVALID_PHONE: 'invalid-phone', OTP_ISSUED: 'otp-issued', LOCKED_OUT: 'locked-out', EMAIL_ALREADY_IN_USE: 'email-already-in-use', EMAIL_SAME_AS_CURRENT: 'email-same-as-current', VALID: 'valid' }}
+ * @type {{ INVALID: 'invalid', INVALID_CODE_FORMAT: 'invalid-code-format', INVALID_CODE_CONSUMED_OR_EXPIRED: 'invalid-code-consumed-or-expired', PHONE_REQUIRED: 'phone-required', SIGNED_IN: 'signed-in', INVALID_PHONE: 'invalid-phone', OTP_ISSUED: 'otp-issued', LOCKED_OUT: 'locked-out', ALREADY_IN_USE: 'already-in-use', SAME_AS_CURRENT: 'same-as-current', VALID: 'valid' }}
  */
 export const STATUS = {
   INVALID: 'invalid',
@@ -41,7 +42,7 @@ export const STATUS = {
   INVALID_PHONE: 'invalid-phone',
   OTP_ISSUED: 'otp-issued',
   LOCKED_OUT: 'locked-out',
-  EMAIL_ALREADY_IN_USE: 'email-already-in-use',
-  EMAIL_SAME_AS_CURRENT: 'email-same-as-current',
+  ALREADY_IN_USE: 'already-in-use',
+  SAME_AS_CURRENT: 'same-as-current',
   VALID: 'valid'
 }
