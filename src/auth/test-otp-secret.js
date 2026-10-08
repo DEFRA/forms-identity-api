@@ -20,8 +20,8 @@ function digest(value) {
  * Checks the shared secret that an automated test sends to read a sign-in
  * code. The test and this service hold the same value.
  *
- * The secret is checked when the plugin registers, so that a deployment with
- * a short secret stops at boot.
+ * A secret is valid when it has 32 characters or more. A deployment with a
+ * shorter value, or with no value, refuses every caller.
  * @satisfies {ServerRegisterPluginObject<void>}
  */
 export const testOtpSecret = {
@@ -30,13 +30,8 @@ export const testOtpSecret = {
     register(server) {
       const secret = config.get('otp.testRead.secret')
 
-      if (secret.length < MIN_SECRET_LENGTH) {
-        throw new Error(
-          `OTP_TEST_READ_SECRET must have ${MIN_SECRET_LENGTH} characters or more`
-        )
-      }
-
-      const expected = digest(secret)
+      const expected =
+        secret.length >= MIN_SECRET_LENGTH ? digest(secret) : undefined
 
       server.auth.scheme(TEST_OTP_SECRET, () => ({
         /**
@@ -46,7 +41,11 @@ export const testOtpSecret = {
         authenticate(request, h) {
           const header = request.headers.authorization
 
-          if (typeof header !== 'string' || !header.startsWith(BEARER_PREFIX)) {
+          if (
+            !expected ||
+            typeof header !== 'string' ||
+            !header.startsWith(BEARER_PREFIX)
+          ) {
             throw Boom.unauthorized(null, 'Bearer')
           }
 

@@ -61,11 +61,14 @@ describe('test OTP secret', () => {
     expect(res.statusCode).toBe(401)
   })
 
-  it('stops the server when the secret has fewer than 32 characters', async () => {
-    config.set('otp.testRead.secret', 'a'.repeat(31))
+  it.each([
+    ['fewer than 32 characters', 'a'.repeat(31)],
+    ['no value', '']
+  ])('refuses every caller when the secret has %s', async (_name, secret) => {
+    config.set('otp.testRead.secret', secret)
 
-    await expect(buildServer()).rejects.toThrow(
-      'OTP_TEST_READ_SECRET must have 32 characters or more'
-    )
+    const res = await call(`Bearer ${secret}`)
+
+    expect(res.statusCode).toBe(401)
   })
 })

@@ -1,6 +1,5 @@
 import Boom from '@hapi/boom'
 
-import { config } from '~/src/config/index.js'
 import { PURPOSE, TEST_EMAIL_DOMAIN, TRANSPORT } from '~/src/constants.js'
 import * as testOtpsRepository from '~/src/repositories/test-otps-repository.js'
 
@@ -17,27 +16,14 @@ export function isTestAddress(email) {
 }
 
 /**
- * Whether automated tests can sign in. The test secret is the switch: with
- * no value, a test address gets an email as every other address does.
- *
- * The secret is read on each call rather than once at load, so that a test
- * can set it.
- */
-export function isTestReadOn() {
-  return config.get('otp.testRead.secret') !== ''
-}
-
-/**
  * Whether this code is kept for a test to read. That is so only for a
- * sign-in code, sent by email, to a test address, while the test secret has
- * a value.
+ * sign-in code, sent by email, to a test address.
  * @param {PurposeType} purpose
  * @param {TransportType} transport
  * @param {string} target - the address the code is for
  */
 export function isKeptForTest(purpose, transport, target) {
   return (
-    isTestReadOn() &&
     purpose === PURPOSE.SIGNIN_VERIFY_EMAIL &&
     transport === TRANSPORT.EMAIL &&
     isTestAddress(target)

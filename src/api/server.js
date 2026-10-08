@@ -10,9 +10,7 @@ import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import { requestTracing } from '~/src/helpers/request-tracing.js'
 import { prepareDb } from '~/src/mongo.js'
 import { router } from '~/src/plugins/router.js'
-import testOtp from '~/src/routes/test-otp.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
-import { isTestReadOn } from '~/src/services/test-otp-service.js'
 
 const isProduction = config.get('isProduction')
 
@@ -67,14 +65,8 @@ export async function createServer() {
 
   await prepareDb(server.logger)
   await server.register(serviceJwt)
+  await server.register(testOtpSecret)
   await server.register(router)
-
-  // The test routes exist only while the test secret has a value. In every
-  // other deployment a request to them gets a 404.
-  if (isTestReadOn()) {
-    await server.register(testOtpSecret)
-    server.route(testOtp)
-  }
 
   return server
 }

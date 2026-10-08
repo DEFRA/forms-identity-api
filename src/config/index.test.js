@@ -42,7 +42,7 @@ describe('config', () => {
     expect(config.get('otp.lockout.durationSeconds')).toBe(7200)
   })
 
-  it('should keep sign-in for automated tests off', () => {
+  it('should have no test secret', () => {
     expect(config.get('otp.testRead.secret')).toBe('')
   })
 
