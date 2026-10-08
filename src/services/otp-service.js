@@ -68,7 +68,7 @@ export async function requestOtp(
       throw Boom.badRequest()
     }
 
-    if (purpose === PURPOSE.ACCOUNT_VERIFY_PHONE) {
+    if (purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE) {
       // Get phone from account - ignore anything passed in
       target = account.phone
       // Get account email for auditing purposes
@@ -340,7 +340,10 @@ async function handleWhenAccountExists(
     return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
 
-  // PURPOSE.ACCOUNT_VERIFY_EMAIL or PURPOSE.ACCOUNT_VERIFY_PHONE
+  // Either of:
+  // - PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL
+  // - PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
+  // - PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL
   const verifiedOtp = await otpsRepository.update(claim, {
     verified: true,
     expireAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000)

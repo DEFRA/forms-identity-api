@@ -7,6 +7,7 @@ import { audit } from '@defra/cdp-auditing'
  */
 export const AUDIT_EVENT = {
   EMAIL_CHANGED: 'EmailChanged',
+  PHONE_CHANGED: 'PhoneChanged',
   OTP_ISSUED: 'OtpIssued',
   OTP_LOCKED_OUT: 'OtpLockedOut',
   SIGN_IN: 'SignIn',
@@ -67,6 +68,20 @@ export function auditEmailChanged(accountId, oldEmail, newEmail) {
   auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, newEmail, {
     oldEmail,
     newEmail
+  })
+}
+
+/**
+ * A user changed their phone number (on their logged-in account)
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} email - the email address
+ * @param {string} oldPhone - the old phone number
+ * @param {string} newPhone - the new phone number
+ */
+export function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
+  auditAccountEvent(AUDIT_EVENT.PHONE_CHANGED, accountId, email, {
+    oldPhone,
+    newPhone
   })
 }
 

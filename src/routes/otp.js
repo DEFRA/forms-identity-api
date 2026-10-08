@@ -52,13 +52,19 @@ export default /** @type {ServerRoute[]} */ ([
         throw Boom.badRequest()
       }
       if (
-        purpose === PURPOSE.ACCOUNT_VERIFY_EMAIL &&
+        purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL &&
         transport !== TRANSPORT.EMAIL
       ) {
         throw Boom.badRequest()
       }
       if (
-        purpose === PURPOSE.ACCOUNT_VERIFY_PHONE &&
+        purpose === PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL &&
+        transport !== TRANSPORT.EMAIL
+      ) {
+        throw Boom.badRequest()
+      }
+      if (
+        purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE &&
         transport !== TRANSPORT.SMS
       ) {
         throw Boom.badRequest()

@@ -30,6 +30,13 @@ export function findByEmail(email) {
 }
 
 /**
+ * @param {string} phone - already normalised (correct format) by the service
+ */
+export function findByPhone(phone) {
+  return coll().findOne({ phone })
+}
+
+/**
  * @param {string} id
  */
 export function findById(id) {
