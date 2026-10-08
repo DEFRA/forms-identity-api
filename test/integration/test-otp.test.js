@@ -8,8 +8,7 @@ jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 const SECRET = 'a-test-secret-of-32-characters-x'
 const TEST_ADDRESS = 'perf-1@example.forms.defra.gov.uk'
 
-// Set before the suite hooks build the server, which reads both values
-config.set('otp.testRead.enabled', true)
+// Set before the suite hooks build the server, which reads the value
 config.set('otp.testRead.secret', SECRET)
 
 const { inject, injectWithoutToken, requestCodeResponse, verify } =

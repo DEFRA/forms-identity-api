@@ -12,6 +12,7 @@ import { prepareDb } from '~/src/mongo.js'
 import { router } from '~/src/plugins/router.js'
 import testOtp from '~/src/routes/test-otp.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
+import { isTestReadOn } from '~/src/services/test-otp-service.js'
 
 const isProduction = config.get('isProduction')
 
@@ -68,9 +69,9 @@ export async function createServer() {
   await server.register(serviceJwt)
   await server.register(router)
 
-  // The test routes exist only while the setting is on. In every other
-  // deployment a request to them gets a 404.
-  if (config.get('otp.testRead.enabled')) {
+  // The test routes exist only while the test secret has a value. In every
+  // other deployment a request to them gets a 404.
+  if (isTestReadOn()) {
     await server.register(testOtpSecret)
     server.route(testOtp)
   }

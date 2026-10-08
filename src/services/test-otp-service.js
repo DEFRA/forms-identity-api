@@ -17,18 +17,27 @@ export function isTestAddress(email) {
 }
 
 /**
- * Whether this code is kept for a test to read. That is so only for a
- * sign-in code, sent by email, to a test address, while the setting is on.
+ * Whether automated tests can sign in. The test secret is the switch: with
+ * no value, a test address gets an email as every other address does.
  *
- * The setting is read on each call rather than once at load, so that it has
- * one source and a test can change it.
+ * The secret is read on each call rather than once at load, so that a test
+ * can set it.
+ */
+export function isTestReadOn() {
+  return config.get('otp.testRead.secret') !== ''
+}
+
+/**
+ * Whether this code is kept for a test to read. That is so only for a
+ * sign-in code, sent by email, to a test address, while the test secret has
+ * a value.
  * @param {PurposeType} purpose
  * @param {TransportType} transport
  * @param {string} target - the address the code is for
  */
 export function isKeptForTest(purpose, transport, target) {
   return (
-    config.get('otp.testRead.enabled') &&
+    isTestReadOn() &&
     purpose === PURPOSE.SIGNIN_VERIFY_EMAIL &&
     transport === TRANSPORT.EMAIL &&
     isTestAddress(target)

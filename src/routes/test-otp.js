@@ -5,7 +5,7 @@ import { findTestOtp } from '~/src/services/test-otp-service.js'
 
 /**
  * Routes for automated tests. The server adds them only while
- * otp.testRead.enabled is on, so they are kept out of the routes index.
+ * otp.testRead.secret has a value, so they are kept out of the routes index.
  *
  * Each route names the test secret strategy. The server default accepts
  * forms-identity-ui only, and a test is a different caller.

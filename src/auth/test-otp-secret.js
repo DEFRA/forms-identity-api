@@ -21,7 +21,7 @@ function digest(value) {
  * code. The test and this service hold the same value.
  *
  * The secret is checked when the plugin registers, so that a deployment with
- * a missing or short secret stops at boot.
+ * a short secret stops at boot.
  * @satisfies {ServerRegisterPluginObject<void>}
  */
 export const testOtpSecret = {
@@ -32,7 +32,7 @@ export const testOtpSecret = {
 
       if (secret.length < MIN_SECRET_LENGTH) {
         throw new Error(
-          `OTP_TEST_READ_SECRET must have ${MIN_SECRET_LENGTH} characters or more when OTP_TEST_READ_ENABLED is on`
+          `OTP_TEST_READ_SECRET must have ${MIN_SECRET_LENGTH} characters or more`
         )
       }
 

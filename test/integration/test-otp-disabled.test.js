@@ -8,7 +8,7 @@ const TEST_ADDRESS = 'perf-1@example.forms.defra.gov.uk'
 
 const { inject, injectWithoutToken, requestCodeResponse } = setupSigninFlow()
 
-describe('sign-in for automated tests, with the setting off', () => {
+describe('sign-in for automated tests, with no test secret', () => {
   it('emails the code to a test address and keeps no copy', async () => {
     await requestCodeResponse('uid-off', TEST_ADDRESS)
 

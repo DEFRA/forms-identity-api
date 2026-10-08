@@ -7,6 +7,7 @@ import {
 
 jest.mock('~/src/repositories/test-otps-repository.js')
 
+const SECRET = 'a-test-secret-of-32-characters-x'
 const TEST_ADDRESS = 'perf-1@example.forms.defra.gov.uk'
 
 describe('test-otp-service', () => {
@@ -33,11 +34,11 @@ describe('test-otp-service', () => {
 
   describe('isKeptForTest', () => {
     afterEach(() => {
-      config.set('otp.testRead.enabled', false)
+      config.set('otp.testRead.secret', '')
     })
 
-    it('keeps a sign-in code for a test address while the setting is on', () => {
-      config.set('otp.testRead.enabled', true)
+    it('keeps a sign-in code for a test address while the test secret has a value', () => {
+      config.set('otp.testRead.secret', SECRET)
 
       expect(
         isKeptForTest(
@@ -48,7 +49,7 @@ describe('test-otp-service', () => {
       ).toBe(true)
     })
 
-    it('sends the code while the setting is off', () => {
+    it('sends the code while the test secret has no value', () => {
       expect(
         isKeptForTest(
           PURPOSE.SIGNIN_VERIFY_EMAIL,
@@ -59,7 +60,7 @@ describe('test-otp-service', () => {
     })
 
     it('sends the code to an address on another domain', () => {
-      config.set('otp.testRead.enabled', true)
+      config.set('otp.testRead.secret', SECRET)
 
       expect(
         isKeptForTest(
@@ -71,7 +72,7 @@ describe('test-otp-service', () => {
     })
 
     it('sends a code that is for a change of email address', () => {
-      config.set('otp.testRead.enabled', true)
+      config.set('otp.testRead.secret', SECRET)
 
       expect(
         isKeptForTest(

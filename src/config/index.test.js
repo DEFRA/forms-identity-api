@@ -43,7 +43,6 @@ describe('config', () => {
   })
 
   it('should keep sign-in for automated tests off', () => {
-    expect(config.get('otp.testRead.enabled')).toBe(false)
     expect(config.get('otp.testRead.secret')).toBe('')
   })
 
