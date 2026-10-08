@@ -4,6 +4,7 @@ import {
   OIDC_COLLECTION_NAMES,
   OTPS_COLLECTION_NAME,
   OTP_LOCKOUTS_COLLECTION_NAME,
+  TEST_OTPS_COLLECTION_NAME,
   db
 } from '~/src/mongo.js'
 import { setupIntegrationDb } from '~/test/helpers/mongo-memory.js'
@@ -26,6 +27,12 @@ describe('startup indexes', () => {
     )
   })
 
+  it('keeps one test code per {uid, purpose}', async () => {
+    expect(await indexesOf(TEST_OTPS_COLLECTION_NAME)).toContainEqual(
+      expect.objectContaining({ key: { uid: 1, purpose: 1 }, unique: true })
+    )
+  })
+
   it('keeps one request counter per address', async () => {
     expect(await indexesOf(OTP_LOCKOUTS_COLLECTION_NAME)).toContainEqual(
       expect.objectContaining({ key: { target: 1 }, unique: true })
@@ -37,6 +44,7 @@ describe('startup indexes', () => {
   it.each([
     OTPS_COLLECTION_NAME,
     OTP_LOCKOUTS_COLLECTION_NAME,
+    TEST_OTPS_COLLECTION_NAME,
     ...OIDC_COLLECTION_NAMES
   ])('gives %s a TTL sweeper', async (name) => {
     expect(await indexesOf(name)).toContainEqual(

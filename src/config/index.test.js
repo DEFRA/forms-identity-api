@@ -42,6 +42,11 @@ describe('config', () => {
     expect(config.get('otp.lockout.durationSeconds')).toBe(7200)
   })
 
+  it('should keep sign-in for automated tests off', () => {
+    expect(config.get('otp.testRead.enabled')).toBe(false)
+    expect(config.get('otp.testRead.secret')).toBe('')
+  })
+
   it('should read Notify credentials from the environment', () => {
     expect(config.get('otp.notify.apiKey')).toBe(process.env.NOTIFY_API_KEY)
     expect(config.get('otp.notify.templateId')).toBe(

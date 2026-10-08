@@ -154,6 +154,23 @@ export const config = convict({
         env: 'OTP_LOCKOUT_DURATION_SECONDS'
       }
     },
+    testRead: {
+      /** @type {SchemaObj<boolean>} */
+      enabled: {
+        doc: 'Lets automated tests sign in. When on, a sign-in code for an address on the test email domain is kept for the test to read and is not emailed.',
+        format: Boolean,
+        default: false,
+        env: 'OTP_TEST_READ_ENABLED'
+      },
+      /** @type {SchemaObj<string>} */
+      secret: {
+        doc: 'Secret a test sends to read a sign-in code. Required when otp.testRead.enabled is on, with a minimum of 32 characters. Use a different value in each environment.',
+        format: String,
+        default: '',
+        sensitive: true,
+        env: 'OTP_TEST_READ_SECRET'
+      }
+    },
     notify: {
       /** @type {SchemaObj<string>} */
       apiKey: {

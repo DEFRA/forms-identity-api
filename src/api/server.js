@@ -3,12 +3,14 @@ import Wreck from '@hapi/wreck'
 import { ProxyAgent } from 'proxy-agent'
 
 import { serviceJwt } from '~/src/auth/service-jwt.js'
+import { testOtpSecret } from '~/src/auth/test-otp-secret.js'
 import { config } from '~/src/config/index.js'
 import { failAction } from '~/src/helpers/fail-action.js'
 import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import { requestTracing } from '~/src/helpers/request-tracing.js'
 import { prepareDb } from '~/src/mongo.js'
 import { router } from '~/src/plugins/router.js'
+import testOtp from '~/src/routes/test-otp.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
 
 const isProduction = config.get('isProduction')
@@ -65,6 +67,13 @@ export async function createServer() {
   await prepareDb(server.logger)
   await server.register(serviceJwt)
   await server.register(router)
+
+  // The test routes exist only while the setting is on. In every other
+  // deployment a request to them gets a 404.
+  if (config.get('otp.testRead.enabled')) {
+    await server.register(testOtpSecret)
+    server.route(testOtp)
+  }
 
   return server
 }
