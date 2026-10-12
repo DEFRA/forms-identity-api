@@ -111,10 +111,11 @@ export async function createIndexes(database) {
     .collection(OTP_LOCKOUTS_COLLECTION_NAME)
     .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
 
-  // one record per test address, so a new code replaces the earlier one
+  // one record per test address and purpose, so a new code replaces the
+  // earlier one for that purpose
   await database
     .collection(TEST_OTPS_COLLECTION_NAME)
-    .createIndex({ target: 1 }, { unique: true })
+    .createIndex({ target: 1, purpose: 1 }, { unique: true })
   // expireAt is the expiry of the code itself, so Mongo deletes the plain
   // text when the code can no longer sign anyone in
   await database

@@ -1,6 +1,8 @@
 import { config } from '~/src/config/index.js'
+import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import { TEST_OTPS_COLLECTION_NAME, db } from '~/src/mongo.js'
+import { createAccount } from '~/src/services/signin-service.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
@@ -22,6 +24,39 @@ const readCode = (email, secret = SECRET) =>
     url: `/test/otp/${email}`,
     headers: { authorization: `Bearer ${secret}` }
   })
+
+/**
+ * Reads the kept code for one purpose
+ * @param {string} email
+ * @param {string} purpose
+ */
+const readCodeFor = (email, purpose) =>
+  injectWithoutToken({
+    method: 'GET',
+    url: `/test/otp/${email}/${purpose}`,
+    headers: { authorization: `Bearer ${SECRET}` }
+  })
+
+/**
+ * Requests a code for a change of email address on a new account
+ * @param {string} uid
+ * @param {string} newEmail
+ */
+async function requestChangeOfEmail(uid, newEmail) {
+  const account = await createAccount('citizen@example.com', '+447911123456')
+
+  return inject({
+    method: 'POST',
+    url: '/otp/request',
+    payload: {
+      uid,
+      purpose: PURPOSE.ACCOUNT_VERIFY_EMAIL,
+      transport: TRANSPORT.EMAIL,
+      accountId: account._id,
+      target: newEmail
+    }
+  })
+}
 
 const keptCodes = () =>
   db.collection(TEST_OTPS_COLLECTION_NAME).find().toArray()
@@ -60,6 +95,39 @@ describe('sign-in for automated tests', () => {
     expect(await verify('uid-resend', code)).toEqual({
       status: 'phone-required'
     })
+  })
+
+  it('keeps a code for a change of email address to a test address', async () => {
+    const requested = await requestChangeOfEmail('uid-change', TEST_ADDRESS)
+
+    expect(JSON.parse(requested.payload)).toEqual({ status: 'otp-issued' })
+    expect(sendEmail).not.toHaveBeenCalled()
+
+    const read = await readCodeFor(TEST_ADDRESS, PURPOSE.ACCOUNT_VERIFY_EMAIL)
+
+    expect(read.statusCode).toBe(200)
+    expect(JSON.parse(read.payload).code).toMatch(/^\d{6}$/)
+  })
+
+  it('gives the sign-in code to a read that names no purpose', async () => {
+    await requestChangeOfEmail('uid-change', TEST_ADDRESS)
+    await requestCodeResponse('uid-both', TEST_ADDRESS)
+
+    expect(await keptCodes()).toHaveLength(2)
+
+    const { code } = JSON.parse((await readCode(TEST_ADDRESS)).payload)
+
+    expect(await verify('uid-both', code)).toEqual({
+      status: 'phone-required'
+    })
+  })
+
+  it('answers 404 for a purpose with no code', async () => {
+    await requestCodeResponse('uid-signin-only', TEST_ADDRESS)
+
+    const read = await readCodeFor(TEST_ADDRESS, PURPOSE.ACCOUNT_VERIFY_EMAIL)
+
+    expect(read.statusCode).toBe(404)
   })
 
   it.each([

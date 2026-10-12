@@ -1,8 +1,4 @@
-import { PURPOSE } from '~/src/constants.js'
-import {
-  isKeptForTest,
-  isTestAddress
-} from '~/src/services/test-otp-service.js'
+import { isTestAddress } from '~/src/services/test-otp-service.js'
 
 jest.mock('~/src/repositories/test-otps-repository.js')
 
@@ -28,26 +24,6 @@ describe('test-otp-service', () => {
       'citizen@example.forms.defra.gov.uk@evil.com'
     ])('refuses %s', (email) => {
       expect(isTestAddress(email)).toBe(false)
-    })
-  })
-
-  describe('isKeptForTest', () => {
-    it('keeps a sign-in code for a test address', () => {
-      expect(isKeptForTest(PURPOSE.SIGNIN_VERIFY_EMAIL, TEST_ADDRESS)).toBe(
-        true
-      )
-    })
-
-    it('sends the code to an address on another domain', () => {
-      expect(
-        isKeptForTest(PURPOSE.SIGNIN_VERIFY_EMAIL, 'citizen@defra.gov.uk')
-      ).toBe(false)
-    })
-
-    it('sends a code that is for a change of email address', () => {
-      expect(isKeptForTest(PURPOSE.ACCOUNT_VERIFY_EMAIL, TEST_ADDRESS)).toBe(
-        false
-      )
     })
   })
 })
