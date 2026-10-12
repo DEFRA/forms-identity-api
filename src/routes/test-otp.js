@@ -9,8 +9,9 @@ import { findTestOtp } from '~/src/services/test-otp-service.js'
  *
  * Each route names the test secret strategy. The server default accepts
  * forms-identity-ui only, and a test is a different caller.
+ * @type {ServerRoute[]}
  */
-export default /** @type {ServerRoute[]} */ ([
+export default [
   /**
    * The newest code for a test address, in plain text. The test knows the
    * address it uses, so it reads the code by address. The purpose selects
@@ -28,15 +29,16 @@ export default /** @type {ServerRoute[]} */ ([
         })
       }
     },
+    /** @param {ReadTestOtpRequest} request */
     handler(request) {
-      const { email, purpose } =
-        /** @type {{ email: string, purpose: PurposeType }} */ (request.params)
+      const { email, purpose } = request.params
       return findTestOtp(email, purpose)
     }
   }
-])
+]
 
 /**
- * @import { ServerRoute } from '@hapi/hapi'
+ * @import { Request, ServerRoute } from '@hapi/hapi'
  * @import { PurposeType } from '~/src/constants.js'
+ * @typedef {Request<{ Params: { email: string, purpose: PurposeType } }>} ReadTestOtpRequest
  */
