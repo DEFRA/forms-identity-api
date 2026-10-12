@@ -41,9 +41,9 @@ export const testOtpSecret = {
          * @param {ResponseToolkit} h
          */
         authenticate(request, h) {
-          const sent = String(request.headers.authorization)
+          const sent = request.headers.authorization
 
-          if (!secureEqual(sent, expected)) {
+          if (typeof sent !== 'string' || !secureEqual(sent, expected)) {
             throw Boom.unauthorized(null, 'Bearer')
           }
 
