@@ -14,6 +14,17 @@ function digest(value) {
 }
 
 /**
+ * Whether two strings are equal. Both values are hashed first. The digests
+ * have the same length, which timingSafeEqual needs, and the time the
+ * comparison takes tells a caller nothing about either value.
+ * @param {string} a
+ * @param {string} b
+ */
+function secureEqual(a, b) {
+  return timingSafeEqual(digest(a), digest(b))
+}
+
+/**
  * Checks the shared secret that an automated test sends to read a sign-in
  * code. The test and this service hold the same value.
  * @satisfies {ServerRegisterPluginObject<void>}
@@ -22,7 +33,7 @@ export const testOtpSecret = {
   plugin: {
     name: TEST_OTP_SECRET,
     register(server) {
-      const expected = digest(`Bearer ${config.get('otp.testRead.secret')}`)
+      const expected = `Bearer ${config.get('otp.testRead.secret')}`
 
       server.auth.scheme(TEST_OTP_SECRET, () => ({
         /**
@@ -30,12 +41,9 @@ export const testOtpSecret = {
          * @param {ResponseToolkit} h
          */
         authenticate(request, h) {
-          // Both values are hashed first. The digests have the same length,
-          // which timingSafeEqual needs, and the time the comparison takes
-          // tells a caller nothing about the secret.
-          const sent = digest(String(request.headers.authorization))
+          const sent = String(request.headers.authorization)
 
-          if (!timingSafeEqual(sent, expected)) {
+          if (!secureEqual(sent, expected)) {
             throw Boom.unauthorized(null, 'Bearer')
           }
 
