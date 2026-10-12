@@ -8,6 +8,9 @@ import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import { clearRequestCount } from '~/src/services/otp-service.js'
+import { isTestAddress } from '~/src/services/test-otp-service.js'
+
+export const INVALID_PHONE_MESSAGE = '"phone" must be a mobile phone number'
 
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
@@ -16,6 +19,7 @@ import { clearRequestCount } from '~/src/services/otp-service.js'
  * @param {string} uid
  * @param {string} phone
  * @returns {Promise<CompleteResult>}
+ * @throws {Boom.Boom} badRequest when the phone is not an acceptable mobile number
  */
 export async function completeSignup(uid, phone) {
   const filter = {
@@ -30,13 +34,16 @@ export async function completeSignup(uid, phone) {
     return { status: STATUS.INVALID }
   }
 
-  // normalised to E.164; the route already checked it is a telephone number,
-  // so a throw here means it is a valid number but not a mobile
+  // This is the one place that decides if a phone number is acceptable.
+  // The rule depends on the email of the account, which only the stored
+  // record gives, so that a caller cannot claim to be a test account.
   let phoneNumber
   try {
-    phoneNumber = normaliseMobile(phone)
+    phoneNumber = normaliseMobile(phone, {
+      allowTestNumbers: isTestAddress(doc.target)
+    })
   } catch {
-    return { status: STATUS.INVALID_PHONE }
+    throw Boom.badRequest(INVALID_PHONE_MESSAGE)
   }
 
   const account = await createAccount(doc.target, phoneNumber)
@@ -107,5 +114,5 @@ export async function findAccountById(id) {
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
  * @typedef {{ status: 'otp-issued' } | { status: 'locked-out', lockedUntil: string }} RequestResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
- * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
+ * @typedef {{ status: 'invalid' } | { status: 'signed-in', accountId: string }} CompleteResult
  */

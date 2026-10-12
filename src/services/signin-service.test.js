@@ -920,15 +920,47 @@ describe('signin service', () => {
       )
     })
 
-    it('rejects an invalid phone without consuming the record', async () => {
-      const docs = await verified()
+    it.each([
+      ['020 7946 0000'], // a landline
+      ['not a number'],
+      ['07700900000'] // an Ofcom fictional number on a normal account
+    ])(
+      'refuses the phone %s as a bad request without consuming the record',
+      async (phone) => {
+        const docs = await verified()
 
-      const result = await completeSignup('uid-1', '020 7946 0000')
+        await expect(completeSignup('uid-1', phone)).rejects.toMatchObject({
+          message: '"phone" must be a mobile phone number',
+          output: { statusCode: 400 }
+        })
 
-      expect(result).toEqual({ status: 'invalid-phone' })
-      expect(docs[0].consumed).toBe(false)
-      expect(auditRegistration).not.toHaveBeenCalled()
-      expect(auditSignIn).not.toHaveBeenCalled()
+        expect(docs[0].consumed).toBe(false)
+        expect(accountsRepository.insert).not.toHaveBeenCalled()
+        expect(auditRegistration).not.toHaveBeenCalled()
+        expect(auditSignIn).not.toHaveBeenCalled()
+      }
+    )
+
+    it('accepts an Ofcom fictional number for an account on the test email domain', async () => {
+      const email = 'dummy@example.forms.defra.gov.uk'
+      build().push({
+        _id: 1,
+        uid: 'uid-1',
+        purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
+        target: email,
+        verified: true,
+        consumed: false
+      })
+      jest
+        .mocked(accountsRepository.insert)
+        .mockImplementation((account) => Promise.resolve(account))
+
+      const result = await completeSignup('uid-1', '07700900000')
+
+      expect(result).toMatchObject({ status: 'signed-in' })
+      expect(accountsRepository.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ email, phone: '+447700900000' })
+      )
     })
 
     it('rejects completion without a verified record (out-of-order call)', async () => {

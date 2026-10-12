@@ -9,15 +9,40 @@ const MOBILE_TYPES = new Set([
   PhoneNumberType.FIXED_LINE_OR_MOBILE
 ])
 
+const UK_COUNTRY_CODE = 44
+
+/**
+ * The mobile numbers Ofcom reserves for fiction: 07700 900000 to
+ * 07700 900999. No person owns one, so a test account can use them.
+ */
+const TEST_NATIONAL_NUMBER = /^7700900\d{3}$/
+
+/**
+ * Whether a parsed number is in the Ofcom fictional mobile range
+ * @param {PhoneNumber} parsed
+ */
+function isTestNumber(parsed) {
+  return (
+    parsed.getCountryCode() === UK_COUNTRY_CODE &&
+    TEST_NATIONAL_NUMBER.test(String(parsed.getNationalNumber()))
+  )
+}
+
 /**
  * Validates a mobile number (UK default region, international accepted) and
  * normalises it to E.164
  * @param {string} input
+ * @param {{ allowTestNumbers?: boolean }} [options] - allowTestNumbers
+ * accepts the Ofcom fictional mobile range, which is for test accounts only
  * @returns {string} the number in E.164 format
  * @throws {Error} when the input is not a valid mobile number
  */
-export function normaliseMobile(input) {
+export function normaliseMobile(input, { allowTestNumbers = false } = {}) {
   const parsed = phoneUtil.parse(input, 'GB')
+
+  if (allowTestNumbers && isTestNumber(parsed)) {
+    return phoneUtil.format(parsed, PhoneNumberFormat.E164)
+  }
 
   if (!phoneUtil.isValidNumber(parsed)) {
     throw new Error('Not a valid phone number')
@@ -29,3 +54,7 @@ export function normaliseMobile(input) {
 
   return phoneUtil.format(parsed, PhoneNumberFormat.E164)
 }
+
+/**
+ * @import { PhoneNumber } from 'google-libphonenumber'
+ */

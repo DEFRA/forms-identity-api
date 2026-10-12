@@ -19,4 +19,24 @@ describe('normaliseMobile', () => {
   ])('throws on %s', (input) => {
     expect(() => normaliseMobile(input)).toThrow()
   })
+
+  describe('with test numbers allowed', () => {
+    it.each([
+      ['07700900000', '+447700900000'], // first number of the Ofcom range
+      ['07700 900999', '+447700900999'], // last number of the Ofcom range
+      ['+44 7700 900123', '+447700900123'],
+      ['07911 123456', '+447911123456'] // a real mobile is still accepted
+    ])('normalises %s to %s', (input, expected) => {
+      expect(normaliseMobile(input, { allowTestNumbers: true })).toBe(expected)
+    })
+
+    it.each([
+      ['07700 901000'], // one above the Ofcom range
+      ['+33 7700 900000'], // the range is a UK range
+      ['020 7946 0000'],
+      ['not a number']
+    ])('throws on %s', (input) => {
+      expect(() => normaliseMobile(input, { allowTestNumbers: true })).toThrow()
+    })
+  })
 })

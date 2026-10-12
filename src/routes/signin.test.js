@@ -1,3 +1,4 @@
+import Boom from '@hapi/boom'
 import Hapi from '@hapi/hapi'
 
 import accountRoutes from '~/src/routes/account.js'
@@ -139,7 +140,12 @@ describe('signin routes', () => {
     }
   })
 
-  it('POST /accounts rejects text that is not a telephone number with 400', async () => {
+  it('POST /accounts answers 400 with the detail when the service refuses the phone', async () => {
+    jest
+      .mocked(completeSignup)
+      .mockRejectedValue(
+        Boom.badRequest('"phone" must be a mobile phone number')
+      )
     const server = await buildServer()
 
     const res = await server.inject({
@@ -149,21 +155,11 @@ describe('signin routes', () => {
     })
 
     expect(res.statusCode).toBe(400)
-    expect(completeSignup).not.toHaveBeenCalled()
-  })
-
-  it('POST /accounts passes real-but-non-mobile numbers to the service (its rule)', async () => {
-    jest.mocked(completeSignup).mockResolvedValue({ status: 'invalid-phone' })
-    const server = await buildServer()
-
-    const res = await server.inject({
-      method: 'POST',
-      url: '/accounts',
-      payload: { uid: 'uid-1', phone: '020 7946 0000' }
+    expect(JSON.parse(res.payload)).toEqual({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: '"phone" must be a mobile phone number'
     })
-
-    expect(res.statusCode).toBe(200)
-    expect(JSON.parse(res.payload)).toEqual({ status: 'invalid-phone' })
   })
 
   it('POST /accounts delegates to completeSignup', async () => {

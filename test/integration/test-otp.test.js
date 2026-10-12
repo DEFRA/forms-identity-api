@@ -10,7 +10,7 @@ jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 const SECRET = config.get('otp.testRead.secret')
 const TEST_ADDRESS = 'perf-1@example.forms.defra.gov.uk'
 
-const { inject, injectWithoutToken, requestCodeResponse, verify } =
+const { inject, injectWithoutToken, requestCode, requestCodeResponse, verify } =
   setupSigninFlow()
 
 /**
@@ -82,6 +82,45 @@ describe('sign-in for automated tests', () => {
     expect(await verify('uid-test', code)).toEqual({
       status: 'phone-required'
     })
+  })
+
+  it('registers a test address with an Ofcom fictional phone number', async () => {
+    await requestCodeResponse('uid-register', TEST_ADDRESS)
+    const { code } = JSON.parse((await readCode(TEST_ADDRESS)).payload)
+    await verify('uid-register', code)
+
+    const res = await inject({
+      method: 'POST',
+      url: '/accounts',
+      payload: { uid: 'uid-register', phone: '07700900000' }
+    })
+
+    expect(res.statusCode).toBe(200)
+
+    const { accountId } = JSON.parse(res.payload)
+    const account = await inject({
+      method: 'GET',
+      url: `/accounts/${accountId}`
+    })
+
+    expect(JSON.parse(account.payload)).toEqual({
+      id: accountId,
+      email: TEST_ADDRESS,
+      phone: '+447700900000'
+    })
+  })
+
+  it('refuses an Ofcom fictional phone number for a normal address', async () => {
+    const code = await requestCode('uid-normal', 'citizen@example.com')
+    await verify('uid-normal', code)
+
+    const res = await inject({
+      method: 'POST',
+      url: '/accounts',
+      payload: { uid: 'uid-normal', phone: '07700900000' }
+    })
+
+    expect(res.statusCode).toBe(400)
   })
 
   it('gives the newest code after a resend', async () => {
