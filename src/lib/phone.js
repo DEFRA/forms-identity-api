@@ -32,24 +32,24 @@ function isTestNumber(parsed) {
  * Validates a mobile number (UK default region, international accepted) and
  * normalises it to E.164
  * @param {string} input
- * @param {{ allowTestNumbers?: boolean }} [options] - allowTestNumbers
- * accepts the Ofcom fictional mobile range, which is for test accounts only
+ * @param {boolean} [allowTestNumbers] - accepts the Ofcom fictional mobile
+ * range, which is for test accounts only
  * @returns {string} the number in E.164 format
  * @throws {Error} when the input is not a valid mobile number
  */
-export function normaliseMobile(input, { allowTestNumbers = false } = {}) {
+export function normaliseMobile(input, allowTestNumbers = false) {
   const parsed = phoneUtil.parse(input, 'GB')
 
-  if (allowTestNumbers && isTestNumber(parsed)) {
-    return phoneUtil.format(parsed, PhoneNumberFormat.E164)
-  }
+  // The library reports a fictional number as not valid, so the checks
+  // below apply to all other numbers
+  if (!(allowTestNumbers && isTestNumber(parsed))) {
+    if (!phoneUtil.isValidNumber(parsed)) {
+      throw new Error('Not a valid phone number')
+    }
 
-  if (!phoneUtil.isValidNumber(parsed)) {
-    throw new Error('Not a valid phone number')
-  }
-
-  if (!MOBILE_TYPES.has(phoneUtil.getNumberType(parsed))) {
-    throw new Error('Not a mobile phone number')
+    if (!MOBILE_TYPES.has(phoneUtil.getNumberType(parsed))) {
+      throw new Error('Not a mobile phone number')
+    }
   }
 
   return phoneUtil.format(parsed, PhoneNumberFormat.E164)

@@ -27,7 +27,7 @@ describe('normaliseMobile', () => {
       ['+44 7700 900123', '+447700900123'],
       ['07911 123456', '+447911123456'] // a real mobile is still accepted
     ])('normalises %s to %s', (input, expected) => {
-      expect(normaliseMobile(input, { allowTestNumbers: true })).toBe(expected)
+      expect(normaliseMobile(input, true)).toBe(expected)
     })
 
     it.each([
@@ -36,7 +36,7 @@ describe('normaliseMobile', () => {
       ['020 7946 0000'],
       ['not a number']
     ])('throws on %s', (input) => {
-      expect(() => normaliseMobile(input, { allowTestNumbers: true })).toThrow()
+      expect(() => normaliseMobile(input, true)).toThrow()
     })
   })
 })

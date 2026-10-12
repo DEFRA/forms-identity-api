@@ -39,9 +39,7 @@ export async function completeSignup(uid, phone) {
   // record gives, so that a caller cannot claim to be a test account.
   let phoneNumber
   try {
-    phoneNumber = normaliseMobile(phone, {
-      allowTestNumbers: isTestAddress(doc.target)
-    })
+    phoneNumber = normaliseMobile(phone, isTestAddress(doc.target))
   } catch {
     throw Boom.badRequest(INVALID_PHONE_MESSAGE)
   }
