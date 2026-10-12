@@ -16,17 +16,13 @@ function digest(value) {
 /**
  * Checks the shared secret that an automated test sends to read a sign-in
  * code. The test and this service hold the same value.
- *
- * A deployment with no secret refuses every caller, so that an empty token
- * is not a match for an empty secret.
  * @satisfies {ServerRegisterPluginObject<void>}
  */
 export const testOtpSecret = {
   plugin: {
     name: TEST_OTP_SECRET,
     register(server) {
-      const secret = config.get('otp.testRead.secret')
-      const expected = digest(`Bearer ${secret}`)
+      const expected = digest(`Bearer ${config.get('otp.testRead.secret')}`)
 
       server.auth.scheme(TEST_OTP_SECRET, () => ({
         /**
@@ -39,7 +35,7 @@ export const testOtpSecret = {
           // tells a caller nothing about the secret.
           const sent = digest(String(request.headers.authorization))
 
-          if (!secret || !timingSafeEqual(sent, expected)) {
+          if (!timingSafeEqual(sent, expected)) {
             throw Boom.unauthorized(null, 'Bearer')
           }
 

@@ -3,7 +3,7 @@ import Hapi from '@hapi/hapi'
 import { TEST_OTP_SECRET, testOtpSecret } from '~/src/auth/test-otp-secret.js'
 import { config } from '~/src/config/index.js'
 
-const SECRET = 'a-test-secret-of-32-characters-x'
+const SECRET = config.get('otp.testRead.secret')
 
 /** Builds a bare server with the strategy and one route that uses it */
 async function buildServer() {
@@ -33,14 +33,6 @@ async function call(authorization) {
 }
 
 describe('test OTP secret', () => {
-  beforeEach(() => {
-    config.set('otp.testRead.secret', SECRET)
-  })
-
-  afterAll(() => {
-    config.set('otp.testRead.secret', '')
-  })
-
   it('accepts the secret as a bearer token', async () => {
     const res = await call(`Bearer ${SECRET}`)
 
@@ -57,14 +49,6 @@ describe('test OTP secret', () => {
     ['the secret with another scheme', `Basic ${SECRET}`]
   ])('refuses %s', async (_name, authorization) => {
     const res = await call(authorization)
-
-    expect(res.statusCode).toBe(401)
-  })
-
-  it('refuses an empty token when the secret has no value', async () => {
-    config.set('otp.testRead.secret', '')
-
-    const res = await call('Bearer ')
 
     expect(res.statusCode).toBe(401)
   })

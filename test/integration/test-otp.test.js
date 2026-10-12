@@ -5,11 +5,8 @@ import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
 
-const SECRET = 'a-test-secret-of-32-characters-x'
+const SECRET = config.get('otp.testRead.secret')
 const TEST_ADDRESS = 'perf-1@example.forms.defra.gov.uk'
-
-// Set before the suite hooks build the server, which reads the value
-config.set('otp.testRead.secret', SECRET)
 
 const { inject, injectWithoutToken, requestCodeResponse, verify } =
   setupSigninFlow()
