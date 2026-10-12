@@ -34,9 +34,10 @@ export async function completeSignup(uid, phone) {
     return { status: STATUS.INVALID }
   }
 
-  // This is the one place that decides if a phone number is acceptable.
-  // The rule depends on the email of the account, which only the stored
-  // record gives, so that a caller cannot claim to be a test account.
+  // The route checked that this has the shape of a telephone number. This
+  // step decides if the account can use it. The rule depends on the email
+  // of the account, which only the stored record gives, so that a caller
+  // cannot claim to be a test account.
   let phoneNumber
   try {
     phoneNumber = normaliseMobile(phone, isTestAddress(doc.target))

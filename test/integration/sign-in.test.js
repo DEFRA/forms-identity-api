@@ -138,10 +138,7 @@ describe('citizen sign-in journeys', () => {
     expect(JSON.parse(mobile.payload)).toMatchObject({ status: 'signed-in' })
   })
 
-  it('answers 400 for input that is not a telephone number', async () => {
-    const code = await requestCode('uid-garbage')
-    await verify('uid-garbage', code)
-
+  it('stops non-telephone input at route validation with 400', async () => {
     const res = await inject({
       method: 'POST',
       url: '/accounts',
@@ -149,6 +146,9 @@ describe('citizen sign-in journeys', () => {
     })
 
     expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.payload)).toMatchObject({
+      message: '"phone" must be a telephone number'
+    })
   })
 
   it('rejects completion for an interaction that never verified', async () => {

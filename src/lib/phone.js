@@ -21,7 +21,7 @@ const TEST_NATIONAL_NUMBER = /^7700900\d{3}$/
  * Whether a parsed number is in the Ofcom fictional mobile range
  * @param {PhoneNumber} parsed
  */
-function isTestNumber(parsed) {
+export function isTestNumber(parsed) {
   return (
     parsed.getCountryCode() === UK_COUNTRY_CODE &&
     TEST_NATIONAL_NUMBER.test(String(parsed.getNationalNumber()))
