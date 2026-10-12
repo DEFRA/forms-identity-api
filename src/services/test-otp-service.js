@@ -1,33 +1,26 @@
 import Boom from '@hapi/boom'
 
-import { PURPOSE, TEST_EMAIL_DOMAIN, TRANSPORT } from '~/src/constants.js'
+import { PURPOSE, TEST_EMAIL_DOMAIN } from '~/src/constants.js'
 import * as testOtpsRepository from '~/src/repositories/test-otps-repository.js'
 
 /**
- * Whether an email address is on the test email domain. The domain is the
- * full text after the last `@`, so that an address on a domain that only
- * contains the test domain is a normal address.
+ * Whether an email address is on the test email domain. The address must
+ * end with `@` and the full domain, so that an address on a domain that
+ * only contains the test domain is a normal address.
  * @param {string} email
  */
 export function isTestAddress(email) {
-  const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase()
-
-  return domain === TEST_EMAIL_DOMAIN
+  return email.toLowerCase().endsWith(`@${TEST_EMAIL_DOMAIN}`)
 }
 
 /**
  * Whether this code is kept for a test to read. That is so only for a
- * sign-in code, sent by email, to a test address.
+ * sign-in code to a test address. A sign-in code always goes by email.
  * @param {PurposeType} purpose
- * @param {TransportType} transport
  * @param {string} target - the address the code is for
  */
-export function isKeptForTest(purpose, transport, target) {
-  return (
-    purpose === PURPOSE.SIGNIN_VERIFY_EMAIL &&
-    transport === TRANSPORT.EMAIL &&
-    isTestAddress(target)
-  )
+export function isKeptForTest(purpose, target) {
+  return purpose === PURPOSE.SIGNIN_VERIFY_EMAIL && isTestAddress(target)
 }
 
 /**
@@ -59,5 +52,5 @@ export async function findTestOtp(email) {
 }
 
 /**
- * @import { PurposeType, TransportType } from '~/src/constants.js'
+ * @import { PurposeType } from '~/src/constants.js'
  */

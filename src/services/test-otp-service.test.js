@@ -1,4 +1,4 @@
-import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { PURPOSE } from '~/src/constants.js'
 import {
   isKeptForTest,
   isTestAddress
@@ -18,6 +18,7 @@ describe('test-otp-service', () => {
     )
 
     it.each([
+      'example.forms.defra.gov.uk',
       'citizen@defra.gov.uk',
       'citizen@forms.defra.gov.uk',
       'citizen@evil-example.forms.defra.gov.uk',
@@ -32,33 +33,21 @@ describe('test-otp-service', () => {
 
   describe('isKeptForTest', () => {
     it('keeps a sign-in code for a test address', () => {
-      expect(
-        isKeptForTest(
-          PURPOSE.SIGNIN_VERIFY_EMAIL,
-          TRANSPORT.EMAIL,
-          TEST_ADDRESS
-        )
-      ).toBe(true)
+      expect(isKeptForTest(PURPOSE.SIGNIN_VERIFY_EMAIL, TEST_ADDRESS)).toBe(
+        true
+      )
     })
 
     it('sends the code to an address on another domain', () => {
       expect(
-        isKeptForTest(
-          PURPOSE.SIGNIN_VERIFY_EMAIL,
-          TRANSPORT.EMAIL,
-          'citizen@defra.gov.uk'
-        )
+        isKeptForTest(PURPOSE.SIGNIN_VERIFY_EMAIL, 'citizen@defra.gov.uk')
       ).toBe(false)
     })
 
     it('sends a code that is for a change of email address', () => {
-      expect(
-        isKeptForTest(
-          PURPOSE.ACCOUNT_VERIFY_EMAIL,
-          TRANSPORT.EMAIL,
-          TEST_ADDRESS
-        )
-      ).toBe(false)
+      expect(isKeptForTest(PURPOSE.ACCOUNT_VERIFY_EMAIL, TEST_ADDRESS)).toBe(
+        false
+      )
     })
   })
 })

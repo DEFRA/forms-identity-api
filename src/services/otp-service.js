@@ -135,7 +135,7 @@ export async function requestOtp(
   )
 
   if (transportType === TRANSPORT.EMAIL) {
-    if (isKeptForTest(purpose, transportType, target)) {
+    if (isKeptForTest(purpose, target)) {
       // A test address has no mailbox. The code is kept for the test to
       // read, and Notify is not called.
       await keepTestOtp(target, code, expireAt)
