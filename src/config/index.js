@@ -169,7 +169,7 @@ export const config = convict({
     testRead: {
       /** @type {SchemaObj<string>} */
       secret: {
-        doc: 'Lets automated tests sign in. A sign-in code for an address on the test email domain is kept for the test to read and is not emailed. The test sends this value to read the code. Use a different value in each environment.',
+        doc: 'Lets automated tests sign in. A code that goes by email to an address on the test email domain is kept for the test to read and is not sent. The test sends this value to read the code. Use a different value in each environment.',
         format: nonEmptyString,
         default: /** @type {string | null} */ (null),
         sensitive: true,

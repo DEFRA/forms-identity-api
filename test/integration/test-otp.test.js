@@ -26,7 +26,6 @@ const readCode = (email, secret = SECRET) =>
   })
 
 /**
- * Reads the kept code for one purpose
  * @param {string} email
  * @param {string} purpose
  */
