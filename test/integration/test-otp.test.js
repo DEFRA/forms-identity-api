@@ -14,14 +14,15 @@ const { inject, injectWithoutToken, requestCodeResponse, verify } =
   setupSigninFlow()
 
 /**
- * Reads the kept code as a test does, with the secret as the bearer token
+ * Reads the kept sign-in code as a test does, with the secret as the bearer
+ * token
  * @param {string} email
  * @param {string} [secret]
  */
 const readCode = (email, secret = SECRET) =>
   injectWithoutToken({
     method: 'GET',
-    url: `/test/otp/${email}`,
+    url: `/test/otp/${email}/${PURPOSE.SIGNIN_VERIFY_EMAIL}`,
     headers: { authorization: `Bearer ${secret}` }
   })
 
@@ -108,7 +109,7 @@ describe('sign-in for automated tests', () => {
     expect(JSON.parse(read.payload).code).toMatch(/^\d{6}$/)
   })
 
-  it('gives the sign-in code to a read that names no purpose', async () => {
+  it('gives the sign-in code to a read for the sign-in purpose', async () => {
     await requestChangeOfEmail('uid-change', TEST_ADDRESS)
     await requestCodeResponse('uid-both', TEST_ADDRESS)
 
@@ -176,7 +177,7 @@ describe('sign-in for automated tests', () => {
   it('refuses a caller with no secret', async () => {
     const res = await injectWithoutToken({
       method: 'GET',
-      url: `/test/otp/${TEST_ADDRESS}`
+      url: `/test/otp/${TEST_ADDRESS}/${PURPOSE.SIGNIN_VERIFY_EMAIL}`
     })
 
     expect(res.statusCode).toBe(401)
@@ -185,7 +186,7 @@ describe('sign-in for automated tests', () => {
   it('refuses the forms-identity-ui token on the test route', async () => {
     const res = await inject({
       method: 'GET',
-      url: `/test/otp/${TEST_ADDRESS}`
+      url: `/test/otp/${TEST_ADDRESS}/${PURPOSE.SIGNIN_VERIFY_EMAIL}`
     })
 
     expect(res.statusCode).toBe(401)

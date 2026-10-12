@@ -1,7 +1,7 @@
 import Joi from 'joi'
 
 import { TEST_OTP_SECRET } from '~/src/auth/test-otp-secret.js'
-import { purposeSchema } from '~/src/routes/otp.js'
+import { PURPOSE } from '~/src/constants.js'
 import { findTestOtp } from '~/src/services/test-otp-service.js'
 
 /**
@@ -12,19 +12,20 @@ export default /** @type {ServerRoute[]} */ (
   /** @type {unknown[]} */ ([
     /**
      * The newest code for a test address, in plain text. The test knows the
-     * address it uses, so it reads the code by address. A read with no
-     * purpose gives the sign-in code.
+     * address it uses, so it reads the code by address.
      * @type {ServerRoute<{ Params: { email: string, purpose: PurposeType } }>}
      */
     ({
       method: 'GET',
-      path: '/test/otp/{email}/{purpose?}',
+      path: '/test/otp/{email}/{purpose}',
       options: {
         auth: TEST_OTP_SECRET,
         validate: {
           params: Joi.object({
             email: Joi.string().required(),
-            purpose: purposeSchema
+            purpose: Joi.string()
+              .valid(...Object.keys(PURPOSE))
+              .required()
           })
         }
       },

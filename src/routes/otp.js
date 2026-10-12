@@ -7,7 +7,7 @@ import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 const transportSchema = Joi.string()
   .valid(...Object.keys(TRANSPORT))
   .default(TRANSPORT.EMAIL)
-export const purposeSchema = Joi.string()
+const purposeSchema = Joi.string()
   .valid(...Object.keys(PURPOSE))
   .default(PURPOSE.SIGNIN_VERIFY_EMAIL)
 
