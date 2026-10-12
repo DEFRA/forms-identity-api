@@ -125,10 +125,7 @@ describe('citizen sign-in journeys', () => {
       url: '/accounts',
       payload: { uid: 'uid-landline', phone: '020 7946 0000' }
     })
-    expect(landline.statusCode).toBe(400)
-    expect(JSON.parse(landline.payload)).toMatchObject({
-      message: '"phone" must be a mobile phone number'
-    })
+    expect(JSON.parse(landline.payload)).toEqual({ status: 'invalid-phone' })
 
     const mobile = await inject({
       method: 'POST',

@@ -10,8 +10,6 @@ import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import { clearRequestCount } from '~/src/services/otp-service.js'
 import { isTestAddress } from '~/src/services/test-otp-service.js'
 
-export const INVALID_PHONE_MESSAGE = '"phone" must be a mobile phone number'
-
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
  * for this uid. Account creation precedes consumption so a crash between
@@ -19,7 +17,6 @@ export const INVALID_PHONE_MESSAGE = '"phone" must be a mobile phone number'
  * @param {string} uid
  * @param {string} phone
  * @returns {Promise<CompleteResult>}
- * @throws {Boom.Boom} badRequest when the phone is not an acceptable mobile number
  */
 export async function completeSignup(uid, phone) {
   const filter = {
@@ -42,7 +39,7 @@ export async function completeSignup(uid, phone) {
   try {
     phoneNumber = normaliseMobile(phone, isTestAddress(doc.target))
   } catch {
-    throw Boom.badRequest(INVALID_PHONE_MESSAGE)
+    return { status: STATUS.INVALID_PHONE }
   }
 
   const account = await createAccount(doc.target, phoneNumber)
@@ -113,5 +110,5 @@ export async function findAccountById(id) {
  * @import { AccountDocument } from '~/src/repositories/accounts-repository.js'
  * @typedef {{ status: 'otp-issued' } | { status: 'locked-out', lockedUntil: string }} RequestResult
  * @typedef {{ status: 'invalid' } | { status: 'invalid-code-format' } | { status: 'invalid-code-consumed-or-expired' } | { status: 'phone-required' } | { status: 'signed-in', accountId: string }} VerifyResult
- * @typedef {{ status: 'invalid' } | { status: 'signed-in', accountId: string }} CompleteResult
+ * @typedef {{ status: 'invalid' } | { status: 'invalid-phone' } | { status: 'signed-in', accountId: string }} CompleteResult
  */

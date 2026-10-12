@@ -120,7 +120,7 @@ describe('sign-in for automated tests', () => {
       payload: { uid: 'uid-normal', phone: '07700900000' }
     })
 
-    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.payload)).toEqual({ status: 'invalid-phone' })
   })
 
   it('gives the newest code after a resend', async () => {

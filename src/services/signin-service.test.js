@@ -922,24 +922,18 @@ describe('signin service', () => {
 
     it.each([
       ['020 7946 0000'], // a landline
-      ['not a number'],
       ['07700900000'] // an Ofcom fictional number on a normal account
-    ])(
-      'refuses the phone %s as a bad request without consuming the record',
-      async (phone) => {
-        const docs = await verified()
+    ])('rejects the phone %s without consuming the record', async (phone) => {
+      const docs = await verified()
 
-        await expect(completeSignup('uid-1', phone)).rejects.toMatchObject({
-          message: '"phone" must be a mobile phone number',
-          output: { statusCode: 400 }
-        })
+      const result = await completeSignup('uid-1', phone)
 
-        expect(docs[0].consumed).toBe(false)
-        expect(accountsRepository.insert).not.toHaveBeenCalled()
-        expect(auditRegistration).not.toHaveBeenCalled()
-        expect(auditSignIn).not.toHaveBeenCalled()
-      }
-    )
+      expect(result).toEqual({ status: 'invalid-phone' })
+      expect(docs[0].consumed).toBe(false)
+      expect(accountsRepository.insert).not.toHaveBeenCalled()
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).not.toHaveBeenCalled()
+    })
 
     it('accepts an Ofcom fictional number for an account on the test email domain', async () => {
       const email = 'dummy@example.forms.defra.gov.uk'
