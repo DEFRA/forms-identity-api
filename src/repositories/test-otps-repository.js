@@ -28,7 +28,8 @@ export function findOne(filter) {
 
 /**
  * Upserts the record for an address, so that a new code replaces the
- * earlier one
+ * earlier one. `createdAt` is set on insert only, so that it keeps the time
+ * of the first code for the address when later codes replace the fields.
  * @param {string} target
  * @param {MatchKeysAndValues<TestOtpDocument>} fields
  */
