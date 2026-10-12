@@ -74,6 +74,11 @@ export async function requestOtp(
       // Get account email for auditing purposes
       accountEmail = account.email
     }
+
+    if (purpose === PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL) {
+      // Get email from account - ignore anything passed in
+      target = account.email
+    }
   }
 
   if (!target) {
