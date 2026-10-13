@@ -31,6 +31,25 @@ const LOCKOUT_MS = config.get('otp.lockout.durationSeconds') * 1000
 // are isolated per interaction and per purpose.
 
 /**
+ * Determine if the phone registered to the account should be used (as opposed to any phone number passed in)
+ * @param {PurposeType} purpose
+ */
+function usePhoneFromAccount(purpose) {
+  return purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
+}
+
+/**
+ * Determine if the email registered to the account should be used (as opposed to any email address passed in)
+ * @param {PurposeType} purpose
+ */
+function useEmailFromAccount(purpose) {
+  return (
+    purpose === PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL ||
+    purpose === PURPOSE.ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL
+  )
+}
+
+/**
  * Issues a 6-digit code, stores only its argon2 hash keyed by
  * {uid, purpose} (upsert = resend semantics: one live code per authority
  * per interaction) and delivers the plaintext via Notify
@@ -68,17 +87,14 @@ export async function requestOtp(
       throw Boom.badRequest()
     }
 
-    if (purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE) {
+    if (usePhoneFromAccount(purpose)) {
       // Get phone from account - ignore anything passed in
       target = account.phone
       // Get account email for auditing purposes
       accountEmail = account.email
     }
 
-    if (
-      purpose === PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL ||
-      purpose === PURPOSE.ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL
-    ) {
+    if (useEmailFromAccount(purpose)) {
       // Get email from account - ignore anything passed in
       target = account.email
     }
