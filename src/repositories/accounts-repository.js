@@ -7,7 +7,7 @@ export { isDuplicateKeyError } from '~/src/mongo.js'
  * @property {string} _id - opaque durable account id (feeds the OIDC `sub`)
  * @property {string} email - lowercased email, verified by OTP at sign-up (unique index)
  * @property {string} phone - recovery mobile, E.164 (capture-only for now)
- * @property {'active'} status - lifecycle state
+ * @property {'active' | 'deleted'} status - lifecycle state
  * @property {Date} createdAt - when the account was created
  * @property {Date} updatedAt - when the account was last modified
  */
@@ -53,7 +53,7 @@ export async function insert(account) {
  * @param {Partial<AccountDocument>} fields
  */
 export async function update(id, fields) {
-  await coll().updateOne({ _id: id }, { $set: fields })
+  return coll().updateOne({ _id: id }, { $set: fields })
 }
 
 /**

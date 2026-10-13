@@ -1,6 +1,6 @@
 import Joi from 'joi'
 
-import { updateEmail } from '~/src/services/account-service.js'
+import { deleteAccount, updateEmail } from '~/src/services/account-service.js'
 import { findAccountById } from '~/src/services/signin-service.js'
 
 /**
@@ -42,6 +42,26 @@ export default /** @type {ServerRoute[]} */ (
         // New email is derived from OTP that has been verified
         const res = await updateEmail(uid, id)
         return res
+      }
+    }),
+    /** @type {ServerRoute<{ Params: { uid: string, id: string } }>} */
+    ({
+      method: 'DELETE',
+      path: '/accounts/{uid}/{id}',
+      options: {
+        validate: {
+          params: Joi.object({
+            uid: Joi.string().required(),
+            id: Joi.string().required()
+          })
+        }
+      },
+      async handler(request) {
+        const { id } = request.params
+
+        await deleteAccount(id)
+
+        return { ok: true, message: `Account ${id} deleted successfully` }
       }
     })
   ])

@@ -1,3 +1,5 @@
+import Boom from '@hapi/boom'
+
 import { PURPOSE, STATUS } from '~/src/constants.js'
 import { auditEmailChanged } from '~/src/lib/audit.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
@@ -82,6 +84,32 @@ export async function updateEmail(uid, id) {
   auditEmailChanged(account._id, oldEmail, newEmail)
 
   return { status: STATUS.VALID }
+}
+
+/**
+ * Deletes an account by marking it as 'deleted' in the database.
+ * The account is not actually removed from the database, but is instead marked as deleted so that it can be recovered if necessary.
+ * @param {string} id
+ * @throws {Boom.Boom} Throws a Boom error if the account is not found.
+ * @throws {Boom.Boom} Throws a Boom error if the account could not be deleted.
+ */
+export async function deleteAccount(id) {
+  /** @type {Partial<AccountDocument>} */
+  const accountUpdate = {
+    status: 'deleted',
+    updatedAt: new Date()
+  }
+
+  const { matchedCount: matched, modifiedCount: modified } =
+    await accountsRepository.update(id, accountUpdate)
+
+  if (matched === 0) {
+    throw Boom.notFound(`Account ${id} not found`)
+  }
+
+  if (modified === 0) {
+    throw Boom.badRequest(`Account ${id} could not be deleted`)
+  }
 }
 
 /**

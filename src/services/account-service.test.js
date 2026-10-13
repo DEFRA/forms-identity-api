@@ -1,9 +1,13 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
+import Boom from '@hapi/boom'
 
-import { findById } from '~/src/repositories/accounts-repository.js'
+import {
+  findById,
+  update as updateAccount
+} from '~/src/repositories/accounts-repository.js'
 import { findOne, update } from '~/src/repositories/otps-repository.js'
-import { updateEmail } from '~/src/services/account-service.js'
+import { deleteAccount, updateEmail } from '~/src/services/account-service.js'
 
 jest.mock('~/src/repositories/accounts-repository.js')
 jest.mock('~/src/repositories/otps-repository.js')
@@ -97,6 +101,39 @@ describe('account service', () => {
       email: 'new-email@test.com',
       newEmail: 'new-email@test.com',
       oldEmail: 'current-email@test.com'
+    })
+  })
+
+  describe('delete account', () => {
+    it('should throw Boom.notFound when account not found', async () => {
+      jest
+        .mocked(updateAccount)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+
+      await expect(deleteAccount(id)).rejects.toThrow(
+        Boom.notFound(`Account ${id} not found`)
+      )
+    })
+
+    it('should throw Boom.badRequest when account found but not updated', async () => {
+      jest
+        .mocked(updateAccount)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ matchedCount: 1, modifiedCount: 0 })
+
+      await expect(deleteAccount(id)).rejects.toThrow(
+        Boom.badRequest(`Account ${id} could not be deleted`)
+      )
+    })
+
+    it('should not throw if successful', async () => {
+      jest
+        .mocked(updateAccount)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ matchedCount: 1, modifiedCount: 1 })
+
+      await expect(deleteAccount(id)).resolves.toBeUndefined()
     })
   })
 })
