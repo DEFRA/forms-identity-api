@@ -11,6 +11,17 @@ const purposeSchema = Joi.string()
   .valid(...Object.keys(PURPOSE))
   .default(PURPOSE.SIGNIN_VERIFY_EMAIL)
 
+/** @type {Set<PurposeType>} */
+const transportMustBeEmail = new Set([
+  PURPOSE.SIGNIN_VERIFY_EMAIL,
+  PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
+  PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL,
+  PURPOSE.ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL
+])
+
+/** @type {Set<PurposeType>} */
+const transportMustBeSms = new Set([PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE])
+
 /**
  * Domain routes for OTP operations, consumed only by forms-identity-ui over the
  * internal network (this whole service is private in CDP).
@@ -45,28 +56,10 @@ export default /** @type {ServerRoute[]} */ ([
           request.payload
         )
       // Further guards (in addition to Joi schema)
-      if (
-        purpose === PURPOSE.SIGNIN_VERIFY_EMAIL &&
-        transport !== TRANSPORT.EMAIL
-      ) {
+      if (transportMustBeEmail.has(purpose) && transport !== TRANSPORT.EMAIL) {
         throw Boom.badRequest()
       }
-      if (
-        purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL &&
-        transport !== TRANSPORT.EMAIL
-      ) {
-        throw Boom.badRequest()
-      }
-      if (
-        purpose === PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL &&
-        transport !== TRANSPORT.EMAIL
-      ) {
-        throw Boom.badRequest()
-      }
-      if (
-        purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE &&
-        transport !== TRANSPORT.SMS
-      ) {
+      if (transportMustBeSms.has(purpose) && transport !== TRANSPORT.SMS) {
         throw Boom.badRequest()
       }
       return requestOtp(uid, target, transport, purpose, accountId)
