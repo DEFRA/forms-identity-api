@@ -52,12 +52,19 @@ describe('otp-service', () => {
     })
 
     it('should create OTP for email', async () => {
+      jest
+        .mocked(findById)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({
+          phone: '+447507123456',
+          email: 'test-email@test.com'
+        })
       await requestOtp(
         uid,
         'test-email@test.com',
         TRANSPORT.EMAIL,
         PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-        undefined
+        'acc-id'
       )
       expect(sendEmail).toHaveBeenCalledWith(
         'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',

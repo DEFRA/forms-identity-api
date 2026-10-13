@@ -80,8 +80,11 @@ export async function requestOtp(
     }
   }
 
-  if (accountId) {
+  if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
+    if (!accountId) {
+      throw Boom.badRequest()
+    }
     const account = await accountsRepository.findById(accountId)
     if (!account) {
       throw Boom.badRequest()
