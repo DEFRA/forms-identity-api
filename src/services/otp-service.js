@@ -50,6 +50,20 @@ function useEmailFromAccount(purpose) {
 }
 
 /**
+ * Lookup account
+ * @param { string | undefined } accountId
+ */
+async function getAccountWithGuard(accountId) {
+  const account = accountId
+    ? await accountsRepository.findById(accountId)
+    : undefined
+  if (!account) {
+    throw Boom.badRequest()
+  }
+  return account
+}
+
+/**
  * Issues a 6-digit code, stores only its argon2 hash keyed by
  * {uid, purpose} (upsert = resend semantics: one live code per authority
  * per interaction) and delivers the plaintext via Notify
@@ -82,13 +96,7 @@ export async function requestOtp(
 
   if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
-    if (!accountId) {
-      throw Boom.badRequest()
-    }
-    const account = await accountsRepository.findById(accountId)
-    if (!account) {
-      throw Boom.badRequest()
-    }
+    const account = await getAccountWithGuard(accountId)
 
     if (usePhoneFromAccount(purpose)) {
       // Get phone from account - ignore anything passed in
