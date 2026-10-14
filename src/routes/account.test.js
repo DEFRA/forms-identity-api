@@ -1,7 +1,11 @@
 import Hapi from '@hapi/hapi'
 
 import accountRoutes from '~/src/routes/account.js'
-import { updateEmail, updatePhone } from '~/src/services/account-service.js'
+import {
+  deleteAccount,
+  updateEmail,
+  updatePhone
+} from '~/src/services/account-service.js'
 
 jest.mock('~/src/services/account-service.js')
 
@@ -43,5 +47,39 @@ describe('account routes', () => {
     expect(res.statusCode).toBe(200)
     expect(res.result).toEqual({ status: 'valid' })
     expect(updatePhone).toHaveBeenCalledWith('uid-1', 'acc-id', '+447500123456')
+  })
+
+  it('DELETE /accounts/uid/id delegates and returns a success message', async () => {
+    jest.mocked(deleteAccount).mockResolvedValueOnce({ status: 'valid' })
+
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'DELETE',
+      url: '/accounts/uid-1/acc-id'
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.result).toEqual({
+      ok: true,
+      message: 'Account acc-id deleted successfully'
+    })
+    expect(deleteAccount).toHaveBeenCalledWith('uid-1', 'acc-id')
+  })
+
+  it('DELETE /accounts/uid/id returns the service error response', async () => {
+    jest
+      .mocked(deleteAccount)
+      .mockRejectedValueOnce(new Error('Account deletion failed'))
+
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'DELETE',
+      url: '/accounts/uid-1/acc-id'
+    })
+
+    expect(res.statusCode).toBe(500)
+    expect(deleteAccount).toHaveBeenCalledWith('uid-1', 'acc-id')
   })
 })

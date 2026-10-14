@@ -1,6 +1,10 @@
 import Joi from 'joi'
 
-import { updateEmail, updatePhone } from '~/src/services/account-service.js'
+import {
+  deleteAccount,
+  updateEmail,
+  updatePhone
+} from '~/src/services/account-service.js'
 import { findAccountById } from '~/src/services/signin-service.js'
 
 /**
@@ -64,6 +68,26 @@ export default /** @type {ServerRoute[]} */ (
         const { phone } = request.payload
         const res = await updatePhone(uid, id, phone)
         return res
+      }
+    }),
+    /** @type {ServerRoute<{ Params: { uid: string, id: string } }>} */
+    ({
+      method: 'DELETE',
+      path: '/accounts/{uid}/{id}',
+      options: {
+        validate: {
+          params: Joi.object({
+            uid: Joi.string().required(),
+            id: Joi.string().required()
+          })
+        }
+      },
+      async handler(request) {
+        const { uid, id } = request.params
+
+        await deleteAccount(uid, id)
+
+        return { ok: true, message: `Account ${id} deleted successfully` }
       }
     })
   ])
