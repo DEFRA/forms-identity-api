@@ -50,7 +50,7 @@ async function requestChangeOfEmail(uid, newEmail) {
     url: '/otp/request',
     payload: {
       uid,
-      purpose: PURPOSE.ACCOUNT_VERIFY_EMAIL,
+      purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
       transport: TRANSPORT.EMAIL,
       accountId: account._id,
       target: newEmail
@@ -103,7 +103,10 @@ describe('sign-in for automated tests', () => {
     expect(JSON.parse(requested.payload)).toEqual({ status: 'otp-issued' })
     expect(sendEmail).not.toHaveBeenCalled()
 
-    const read = await readCodeFor(TEST_ADDRESS, PURPOSE.ACCOUNT_VERIFY_EMAIL)
+    const read = await readCodeFor(
+      TEST_ADDRESS,
+      PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL
+    )
 
     expect(read.statusCode).toBe(200)
     expect(JSON.parse(read.payload).code).toMatch(/^\d{6}$/)
@@ -125,7 +128,10 @@ describe('sign-in for automated tests', () => {
   it('answers 404 for a purpose with no code', async () => {
     await requestCodeResponse('uid-signin-only', TEST_ADDRESS)
 
-    const read = await readCodeFor(TEST_ADDRESS, PURPOSE.ACCOUNT_VERIFY_EMAIL)
+    const read = await readCodeFor(
+      TEST_ADDRESS,
+      PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL
+    )
 
     expect(read.statusCode).toBe(404)
   })
