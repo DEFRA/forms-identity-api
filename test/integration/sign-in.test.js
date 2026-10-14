@@ -143,6 +143,9 @@ describe('citizen sign-in journeys', () => {
     })
 
     expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.payload)).toMatchObject({
+      message: '"phone" must be a telephone number'
+    })
   })
 
   it('rejects completion for an interaction that never verified', async () => {

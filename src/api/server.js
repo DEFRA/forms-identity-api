@@ -9,6 +9,7 @@ import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import { requestTracing } from '~/src/helpers/request-tracing.js'
 import { prepareDb } from '~/src/mongo.js'
 import { router } from '~/src/plugins/router.js'
+import { testOtp } from '~/src/plugins/test-otp.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
 
 const isProduction = config.get('isProduction')
@@ -64,6 +65,7 @@ export async function createServer() {
 
   await prepareDb(server.logger)
   await server.register(serviceJwt)
+  await server.register(testOtp)
   await server.register(router)
 
   return server

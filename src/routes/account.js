@@ -1,5 +1,6 @@
 import Joi from 'joi'
 
+import { telephoneSchema } from '~/src/lib/telephone.js'
 import { updateEmail, updatePhone } from '~/src/services/account-service.js'
 import { findAccountById } from '~/src/services/signin-service.js'
 
@@ -55,7 +56,7 @@ export default /** @type {ServerRoute[]} */ (
             id: Joi.string().required()
           }),
           payload: Joi.object({
-            phone: Joi.string().required()
+            phone: telephoneSchema.required()
           })
         }
       },

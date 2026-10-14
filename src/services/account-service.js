@@ -3,6 +3,7 @@ import { auditEmailChanged, auditPhoneChanged } from '~/src/lib/audit.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
+import { isTestAddress } from '~/src/services/test-otp-service.js'
 
 /**
  * Updates the email address on an account
@@ -106,20 +107,21 @@ export async function updatePhone(uid, id, phone) {
     return { status: STATUS.INVALID }
   }
 
-  // normalised to E.164; the route already checked it is a telephone number,
-  // so a throw here means it is a valid number but not a mobile
-  let newPhone
-  try {
-    newPhone = normaliseMobile(phone)
-  } catch {
-    return { status: STATUS.INVALID_PHONE }
-  }
-
   // Check the account exists
   const account = await accountsRepository.findById(id)
 
   if (!account) {
     return { status: STATUS.INVALID }
+  }
+
+  // The route checked that this has the shape of a telephone number. This
+  // step decides if the account can use it. The rule depends on the email
+  // of the stored account, so that a caller cannot claim to be a test account.
+  let newPhone
+  try {
+    newPhone = normaliseMobile(phone, isTestAddress(account.email))
+  } catch {
+    return { status: STATUS.INVALID_PHONE }
   }
 
   const oldPhone = account.phone

@@ -152,6 +152,22 @@ describe('signin routes', () => {
     expect(completeSignup).not.toHaveBeenCalled()
   })
 
+  it('POST /accounts passes an Ofcom fictional number to the service (its rule)', async () => {
+    jest
+      .mocked(completeSignup)
+      .mockResolvedValue({ status: 'signed-in', accountId: 'acc-2' })
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/accounts',
+      payload: { uid: 'uid-1', phone: '07700900000' }
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(completeSignup).toHaveBeenCalledWith('uid-1', '07700900000')
+  })
+
   it('POST /accounts passes real-but-non-mobile numbers to the service (its rule)', async () => {
     jest.mocked(completeSignup).mockResolvedValue({ status: 'invalid-phone' })
     const server = await buildServer()

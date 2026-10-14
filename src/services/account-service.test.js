@@ -284,5 +284,43 @@ describe('account service', () => {
         oldPhone: '+447500111111'
       })
     })
+
+    it('should save an Ofcom fictional number for a test account', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'perf-1@example.forms.defra.gov.uk',
+        phone: '+447700900001'
+      })
+      jest.mocked(update).mockResolvedValueOnce(true)
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+      const res = await updatePhone(uid, id, '07700900000')
+      expect(res).toEqual({ status: 'valid' })
+      expect(updateAccount).toHaveBeenCalledWith(
+        id,
+        expect.objectContaining({ phone: '+447700900000' })
+      )
+    })
+
+    it('should return invalid-phone for an Ofcom fictional number on a normal account', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com',
+        phone: '+447500111111'
+      })
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+      const res = await updatePhone(uid, id, '07700900000')
+      expect(res).toEqual({ status: 'invalid-phone' })
+      expect(updateAccount).not.toHaveBeenCalled()
+      expect(update).not.toHaveBeenCalled()
+      expect(audit).not.toHaveBeenCalled()
+    })
   })
 })

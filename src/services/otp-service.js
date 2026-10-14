@@ -13,6 +13,7 @@ import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
+import { isTestAddress, keepTestOtp } from '~/src/services/test-otp-service.js'
 
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
 const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
@@ -66,7 +67,9 @@ async function getAccountWithGuard(accountId) {
 /**
  * Issues a 6-digit code, stores only its argon2 hash keyed by
  * {uid, purpose} (upsert = resend semantics: one live code per authority
- * per interaction) and delivers the plaintext via Notify
+ * per interaction) and delivers the plaintext via Notify. A code that goes
+ * by email to a test address is kept for the test to read (see
+ * test-otp-service.js).
  * @param {string} uid
  * @param { string | undefined } email - not used if sending by SMS
  * @param {typeof TRANSPORT[keyof typeof TRANSPORT]} transportType
@@ -133,7 +136,12 @@ export async function requestOtp(
   )
 
   if (transportType === TRANSPORT.EMAIL) {
-    await sendOtpEmail(target, code)
+    if (isTestAddress(target)) {
+      // A test address has no mailbox
+      await keepTestOtp(target, purpose, code, expireAt)
+    } else {
+      await sendOtpEmail(target, code)
+    }
     auditOtpIssued(uid, target)
   } else {
     await sendOtpSms(target, code)
