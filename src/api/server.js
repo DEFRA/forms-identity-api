@@ -3,13 +3,13 @@ import Wreck from '@hapi/wreck'
 import { ProxyAgent } from 'proxy-agent'
 
 import { serviceJwt } from '~/src/auth/service-jwt.js'
-import { testOtpSecret } from '~/src/auth/test-otp-secret.js'
 import { config } from '~/src/config/index.js'
 import { failAction } from '~/src/helpers/fail-action.js'
 import { requestLogger } from '~/src/helpers/logging/request-logger.js'
 import { requestTracing } from '~/src/helpers/request-tracing.js'
 import { prepareDb } from '~/src/mongo.js'
 import { router } from '~/src/plugins/router.js'
+import { testOtp } from '~/src/plugins/test-otp.js'
 import { prepareSecureContext } from '~/src/secure-context.js'
 
 const isProduction = config.get('isProduction')
@@ -65,7 +65,7 @@ export async function createServer() {
 
   await prepareDb(server.logger)
   await server.register(serviceJwt)
-  await server.register(testOtpSecret)
+  await server.register(testOtp)
   await server.register(router)
 
   return server

@@ -1,20 +1,18 @@
 import Hapi from '@hapi/hapi'
 
-import { TEST_OTP_SECRET, testOtpSecret } from '~/src/auth/test-otp-secret.js'
 import { config } from '~/src/config/index.js'
+import { PURPOSE } from '~/src/constants.js'
+import { testOtp } from '~/src/plugins/test-otp.js'
+import { findTestOtp } from '~/src/services/test-otp-service.js'
+
+jest.mock('~/src/services/test-otp-service.js')
 
 const SECRET = config.get('otp.testRead.secret')
 
-/** Builds a bare server with the strategy and one route that uses it */
+/** Builds a bare server with the plugin, which holds the strategy and its route */
 async function buildServer() {
   const server = Hapi.server()
-  await server.register(testOtpSecret)
-  server.route({
-    method: 'GET',
-    path: '/protected',
-    options: { auth: TEST_OTP_SECRET },
-    handler: () => ({ ok: true })
-  })
+  await server.register(testOtp)
   await server.initialize()
   return server
 }
@@ -27,12 +25,16 @@ async function call(authorization) {
 
   return server.inject({
     method: 'GET',
-    url: '/protected',
+    url: `/test/otp/perf-1@example.forms.defra.gov.uk/${PURPOSE.SIGNIN_VERIFY_EMAIL}`,
     headers: authorization ? { authorization } : {}
   })
 }
 
-describe('test OTP secret', () => {
+describe('test OTP', () => {
+  beforeEach(() => {
+    jest.mocked(findTestOtp).mockResolvedValue({ code: '123456' })
+  })
+
   it('accepts the secret as a bearer token', async () => {
     const res = await call(`Bearer ${SECRET}`)
 
