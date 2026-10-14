@@ -31,6 +31,39 @@ const LOCKOUT_MS = config.get('otp.lockout.durationSeconds') * 1000
 // are isolated per interaction and per purpose.
 
 /**
+ * Determine if the phone registered to the account should be used (as opposed to any phone number passed in)
+ * @param {PurposeType} purpose
+ */
+function usePhoneFromAccount(purpose) {
+  return purpose === PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
+}
+
+/**
+ * Determine if the email registered to the account should be used (as opposed to any email address passed in)
+ * @param {PurposeType} purpose
+ */
+function useEmailFromAccount(purpose) {
+  return (
+    purpose === PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL ||
+    purpose === PURPOSE.ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL
+  )
+}
+
+/**
+ * Lookup account
+ * @param { string | undefined } accountId
+ */
+async function getAccountWithGuard(accountId) {
+  const account = accountId
+    ? await accountsRepository.findById(accountId)
+    : undefined
+  if (!account) {
+    throw Boom.badRequest()
+  }
+  return account
+}
+
+/**
  * Issues a 6-digit code, stores only its argon2 hash keyed by
  * {uid, purpose} (upsert = resend semantics: one live code per authority
  * per interaction) and delivers the plaintext via Notify
@@ -61,18 +94,20 @@ export async function requestOtp(
     }
   }
 
-  if (accountId) {
+  if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
-    const account = await accountsRepository.findById(accountId)
-    if (!account) {
-      throw Boom.badRequest()
-    }
+    const account = await getAccountWithGuard(accountId)
 
-    if (purpose === PURPOSE.ACCOUNT_VERIFY_PHONE) {
+    if (usePhoneFromAccount(purpose)) {
       // Get phone from account - ignore anything passed in
       target = account.phone
       // Get account email for auditing purposes
       accountEmail = account.email
+    }
+
+    if (useEmailFromAccount(purpose)) {
+      // Get email from account - ignore anything passed in
+      target = account.email
     }
   }
 
@@ -340,7 +375,10 @@ async function handleWhenAccountExists(
     return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
 
-  // PURPOSE.ACCOUNT_VERIFY_EMAIL or PURPOSE.ACCOUNT_VERIFY_PHONE
+  // Either of:
+  // - PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL
+  // - PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
+  // - PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL
   const verifiedOtp = await otpsRepository.update(claim, {
     verified: true,
     expireAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000)

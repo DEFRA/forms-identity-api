@@ -35,7 +35,7 @@ describe('otp routes', () => {
       expect(requestOtp).not.toHaveBeenCalled()
     })
 
-    it('Purpose of account email but transport of SMS', async () => {
+    it('Purpose of change account email verify email but transport of SMS', async () => {
       const server = await buildServer()
 
       const res = await server.inject({
@@ -43,8 +43,9 @@ describe('otp routes', () => {
         url: '/otp/request',
         payload: {
           uid: 'uid-1',
-          purpose: PURPOSE.ACCOUNT_VERIFY_EMAIL,
-          transport: TRANSPORT.SMS
+          purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
+          transport: TRANSPORT.SMS,
+          accountId: 'acc-id'
         }
       })
 
@@ -52,7 +53,7 @@ describe('otp routes', () => {
       expect(requestOtp).not.toHaveBeenCalled()
     })
 
-    it('Purpose of account phone but transport of email', async () => {
+    it('Purpose of change account email verify phone but transport of email', async () => {
       const server = await buildServer()
 
       const res = await server.inject({
@@ -60,9 +61,28 @@ describe('otp routes', () => {
         url: '/otp/request',
         payload: {
           uid: 'uid-1',
-          purpose: PURPOSE.ACCOUNT_VERIFY_PHONE,
+          purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
           transport: TRANSPORT.EMAIL,
-          target: 'test@email.com'
+          target: 'test@email.com',
+          accountId: 'acc-id'
+        }
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(requestOtp).not.toHaveBeenCalled()
+    })
+
+    it('Purpose of change account phone verify email but transport of SMS', async () => {
+      const server = await buildServer()
+
+      const res = await server.inject({
+        method: 'POST',
+        url: '/otp/request',
+        payload: {
+          uid: 'uid-1',
+          purpose: PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL,
+          transport: TRANSPORT.SMS,
+          accountId: 'acc-id'
         }
       })
 

@@ -1,7 +1,7 @@
 import Hapi from '@hapi/hapi'
 
 import accountRoutes from '~/src/routes/account.js'
-import { updateEmail } from '~/src/services/account-service.js'
+import { updateEmail, updatePhone } from '~/src/services/account-service.js'
 
 jest.mock('~/src/services/account-service.js')
 
@@ -27,5 +27,21 @@ describe('account routes', () => {
     expect(res.statusCode).toBe(200)
     expect(res.result).toEqual({ status: 'valid' })
     expect(updateEmail).toHaveBeenCalledWith('uid-1', 'acc-id')
+  })
+
+  it('PATCH /accounts/uid/id/phone validates and delegates', async () => {
+    jest.mocked(updatePhone).mockResolvedValueOnce({ status: 'valid' })
+
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/accounts/uid-1/acc-id/phone',
+      payload: { phone: '+447500123456' }
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.result).toEqual({ status: 'valid' })
+    expect(updatePhone).toHaveBeenCalledWith('uid-1', 'acc-id', '+447500123456')
   })
 })

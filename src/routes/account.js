@@ -1,6 +1,6 @@
 import Joi from 'joi'
 
-import { updateEmail } from '~/src/services/account-service.js'
+import { updateEmail, updatePhone } from '~/src/services/account-service.js'
 import { findAccountById } from '~/src/services/signin-service.js'
 
 /**
@@ -41,6 +41,28 @@ export default /** @type {ServerRoute[]} */ (
         const { uid, id } = request.params
         // New email is derived from OTP that has been verified
         const res = await updateEmail(uid, id)
+        return res
+      }
+    }),
+    /** @type {ServerRoute<{ Payload: { phone: string }, Params: { uid: string, id: string } }>} */
+    ({
+      method: 'PATCH',
+      path: '/accounts/{uid}/{id}/phone',
+      options: {
+        validate: {
+          params: Joi.object({
+            uid: Joi.string().required(),
+            id: Joi.string().required()
+          }),
+          payload: Joi.object({
+            phone: Joi.string().required()
+          })
+        }
+      },
+      async handler(request) {
+        const { uid, id } = request.params
+        const { phone } = request.payload
+        const res = await updatePhone(uid, id, phone)
         return res
       }
     })
