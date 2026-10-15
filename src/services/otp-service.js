@@ -83,17 +83,6 @@ export async function requestOtp(
   let target = email?.toLowerCase()
   let accountEmail = ''
 
-  if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL && target) {
-    const lockedUntil = await claimOtpRequest(uid, target)
-
-    if (lockedUntil) {
-      return {
-        status: STATUS.LOCKED_OUT,
-        lockedUntil: lockedUntil.toISOString()
-      }
-    }
-  }
-
   if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
     const account = await getAccountWithGuard(accountId)
@@ -113,6 +102,15 @@ export async function requestOtp(
 
   if (!target) {
     throw Boom.badRequest()
+  }
+
+  const lockedUntil = await claimOtpRequest(uid, target)
+
+  if (lockedUntil) {
+    return {
+      status: STATUS.LOCKED_OUT,
+      lockedUntil: lockedUntil.toISOString()
+    }
   }
 
   const code = generateCode()
