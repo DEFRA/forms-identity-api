@@ -87,15 +87,52 @@ export async function prepareDb(logger) {
 }
 
 /**
+ * @param {Db} database
+ */
+async function hasOldIndexOnAccountsEmail(database) {
+  const collections = await database
+    .listCollections({ name: ACCOUNTS_COLLECTION_NAME }, { nameOnly: true })
+    .toArray()
+
+  if (collections.length === 0) {
+    return false
+  }
+
+  const indexes = await database
+    .collection(ACCOUNTS_COLLECTION_NAME)
+    .listIndexes()
+    .toArray()
+
+  // Check if an index exists where the key is { email: 1 } and it doesn't have a partial filter expression
+  return indexes.some((index) => {
+    return (
+      index.key?.email === 1 &&
+      Object.keys(index.key).length === 1 &&
+      index.unique === true &&
+      !index.partialFilterExpression
+    )
+  })
+}
+
+/**
  * Creates the collection indexes (idempotent — createIndex is a no-op when
  * the index already exists). TTL indexes are GC only: expiry correctness is
  * enforced in-app because Mongo's TTL sweep is lazy and best-effort.
  * @param {Db} database
  */
 export async function createIndexes(database) {
-  await database
-    .collection(ACCOUNTS_COLLECTION_NAME)
-    .createIndex({ email: 1 }, { unique: true })
+  if (await hasOldIndexOnAccountsEmail(database)) {
+    await database.collection(ACCOUNTS_COLLECTION_NAME).dropIndex('email_1')
+  }
+  // Only active accounts need unique email addresses; deleted accounts may
+  // retain their email address.
+  await database.collection(ACCOUNTS_COLLECTION_NAME).createIndex(
+    { email: 1 },
+    {
+      unique: true,
+      partialFilterExpression: { status: 'active' }
+    }
+  )
 
   await database
     .collection(OTPS_COLLECTION_NAME)

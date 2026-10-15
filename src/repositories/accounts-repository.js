@@ -26,14 +26,14 @@ function coll() {
  * @param {string} email - already normalised (lowercased) by the service
  */
 export function findByEmail(email) {
-  return coll().findOne({ email })
+  return coll().findOne({ email, status: { $ne: 'deleted' } })
 }
 
 /**
  * @param {string} id
  */
 export function findById(id) {
-  return coll().findOne({ _id: id })
+  return coll().findOne({ _id: id, status: { $ne: 'deleted' } })
 }
 
 /**
