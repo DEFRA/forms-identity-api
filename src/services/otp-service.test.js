@@ -5,11 +5,16 @@ import argon2 from 'argon2'
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
+import {
+  findOne as lockoutFindOne,
+  incrementRequests
+} from '~/src/repositories/otp-lockouts-repository.js'
 import { findOne, update } from '~/src/repositories/otps-repository.js'
 import { requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
 jest.mock('~/src/repositories/accounts-repository.js')
 jest.mock('~/src/repositories/otps-repository.js')
+jest.mock('~/src/repositories/otp-lockouts-repository.js')
 jest.mock('~/src/lib/notify.js')
 jest.mock('@defra/cdp-auditing')
 jest.mock('argon2')
@@ -21,6 +26,9 @@ describe('otp-service', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.mocked(lockoutFindOne).mockResolvedValueOnce(null)
+    // @ts-expect-error - partial mock of test data
+    jest.mocked(incrementRequests).mockResolvedValueOnce({ requests: 0 })
   })
 
   describe('requestOtp', () => {
