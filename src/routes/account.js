@@ -1,5 +1,6 @@
 import Joi from 'joi'
 
+import { telephoneSchema } from '~/src/lib/telephone.js'
 import {
   deleteAccount,
   updateEmail,
@@ -59,7 +60,7 @@ export default /** @type {ServerRoute[]} */ (
             id: Joi.string().required()
           }),
           payload: Joi.object({
-            phone: Joi.string().required()
+            phone: telephoneSchema.required()
           })
         }
       },

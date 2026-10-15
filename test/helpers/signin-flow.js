@@ -6,6 +6,7 @@ import {
   ACCOUNTS_COLLECTION_NAME,
   OTPS_COLLECTION_NAME,
   OTP_LOCKOUTS_COLLECTION_NAME,
+  TEST_OTPS_COLLECTION_NAME,
   client,
   db
 } from '~/src/mongo.js'
@@ -53,7 +54,8 @@ export function setupSigninFlow() {
       [
         ACCOUNTS_COLLECTION_NAME,
         OTPS_COLLECTION_NAME,
-        OTP_LOCKOUTS_COLLECTION_NAME
+        OTP_LOCKOUTS_COLLECTION_NAME,
+        TEST_OTPS_COLLECTION_NAME
       ].map((name) => db.collection(name).deleteMany({}))
     )
   )

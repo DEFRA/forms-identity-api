@@ -7,6 +7,18 @@ const isProduction = process.env.NODE_ENV === 'production'
 const isDev = process.env.NODE_ENV !== 'production'
 const isTest = process.env.NODE_ENV === 'test'
 
+/**
+ * A convict format for a value that must be set. An empty value is refused
+ * as well as a missing one, so that `NAME=` in an environment file does not
+ * count as set.
+ * @param {unknown} value
+ */
+function nonEmptyString(value) {
+  if (typeof value !== 'string' || value === '') {
+    throw new Error('must be a string with a value')
+  }
+}
+
 export const config = convict({
   /**@type {SchemaObj<string>} */
   env: {
@@ -152,6 +164,16 @@ export const config = convict({
         format: Number,
         default: 7200,
         env: 'OTP_LOCKOUT_DURATION_SECONDS'
+      }
+    },
+    testRead: {
+      /** @type {SchemaObj<string>} */
+      secret: {
+        doc: 'Lets automated tests sign in. A code that goes by email to an address on the test email domain is kept for the test to read and is not sent. The test sends this value to read the code. Use a different value in each environment.',
+        format: nonEmptyString,
+        default: /** @type {string | null} */ (null),
+        sensitive: true,
+        env: 'OTP_TEST_READ_SECRET'
       }
     },
     notify: {

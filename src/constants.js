@@ -47,3 +47,12 @@ export const STATUS = {
   SAME_AS_CURRENT: 'same-as-current',
   VALID: 'valid'
 }
+
+/**
+ * The email domain of test accounts. No mailbox exists on this domain, so an
+ * address on it can only belong to an automated test.
+ *
+ * The value is fixed here rather than read from config, so that a change to
+ * it needs a code review as well as a deployment.
+ */
+export const TEST_EMAIL_DOMAIN = 'example.forms.defra.gov.uk'

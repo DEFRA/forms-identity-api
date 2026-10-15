@@ -8,6 +8,7 @@ import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import { clearRequestCount } from '~/src/services/otp-service.js'
+import { isTestAddress } from '~/src/services/test-otp-service.js'
 
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
@@ -30,11 +31,13 @@ export async function completeSignup(uid, phone) {
     return { status: STATUS.INVALID }
   }
 
-  // normalised to E.164; the route already checked it is a telephone number,
-  // so a throw here means it is a valid number but not a mobile
+  // The route checked that this has the shape of a telephone number. This
+  // step decides if the account can use it. The rule depends on the email
+  // of the account, which only the stored record gives, so that a caller
+  // cannot claim to be a test account.
   let phoneNumber
   try {
-    phoneNumber = normaliseMobile(phone)
+    phoneNumber = normaliseMobile(phone, isTestAddress(doc.target))
   } catch {
     return { status: STATUS.INVALID_PHONE }
   }
