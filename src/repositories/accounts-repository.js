@@ -7,7 +7,7 @@ export { isDuplicateKeyError } from '~/src/mongo.js'
  * @property {string} _id - opaque durable account id (feeds the OIDC `sub`)
  * @property {string} email - lowercased email, verified by OTP at sign-up (unique index)
  * @property {string} phone - recovery mobile, E.164 (capture-only for now)
- * @property {'active'} status - lifecycle state
+ * @property {'active' | 'deleted'} status - lifecycle state
  * @property {Date} createdAt - when the account was created
  * @property {Date} updatedAt - when the account was last modified
  */
@@ -26,14 +26,14 @@ function coll() {
  * @param {string} email - already normalised (lowercased) by the service
  */
 export function findByEmail(email) {
-  return coll().findOne({ email })
+  return coll().findOne({ email, status: { $ne: 'deleted' } })
 }
 
 /**
  * @param {string} id
  */
 export function findById(id) {
-  return coll().findOne({ _id: id })
+  return coll().findOne({ _id: id, status: { $ne: 'deleted' } })
 }
 
 /**
@@ -53,9 +53,9 @@ export async function insert(account) {
  * @param {Partial<AccountDocument>} fields
  */
 export async function update(id, fields) {
-  await coll().updateOne({ _id: id }, { $set: fields })
+  return coll().updateOne({ _id: id }, { $set: fields })
 }
 
 /**
- * @import { Collection } from 'mongodb'
+ * @import { Collection , UpdateResult} from 'mongodb'
  */

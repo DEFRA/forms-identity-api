@@ -6,6 +6,7 @@ import { audit } from '@defra/cdp-auditing'
  * record, so downstream consumers can filter on it.
  */
 export const AUDIT_EVENT = {
+  ACCOUNT_DELETED: 'AccountDeleted',
   EMAIL_CHANGED: 'EmailChanged',
   PHONE_CHANGED: 'PhoneChanged',
   OTP_ISSUED: 'OtpIssued',
@@ -129,4 +130,13 @@ export function auditSignOut(accountId, email) {
  */
 export function auditRegistration(accountId, email, phone) {
   auditAccountEvent(AUDIT_EVENT.REGISTRATION, accountId, email, { phone })
+}
+
+/**
+ * An account was deleed
+ * @param {string} accountId
+ * @param {string} email
+ */
+export function auditAccountDeleted(accountId, email) {
+  auditAccountEvent(AUDIT_EVENT.ACCOUNT_DELETED, accountId, email)
 }

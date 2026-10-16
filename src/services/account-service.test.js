@@ -1,5 +1,6 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
+import Boom from '@hapi/boom'
 
 import {
   findByEmail,
@@ -8,7 +9,11 @@ import {
   update as updateAccount
 } from '~/src/repositories/accounts-repository.js'
 import { findOne, update } from '~/src/repositories/otps-repository.js'
-import { updateEmail, updatePhone } from '~/src/services/account-service.js'
+import {
+  deleteAccount,
+  updateEmail,
+  updatePhone
+} from '~/src/services/account-service.js'
 
 jest.mock('~/src/repositories/accounts-repository.js', () => ({
   findByEmail: jest.fn(),
@@ -321,6 +326,89 @@ describe('account service', () => {
       expect(updateAccount).not.toHaveBeenCalled()
       expect(update).not.toHaveBeenCalled()
       expect(audit).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('delete account', () => {
+    const deleteOtp = {
+      ...validOtp,
+      purpose: 'ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL'
+    }
+
+    it('should return invalid when the verified email OTP is not found', async () => {
+      jest.mocked(findOne).mockResolvedValueOnce(null)
+
+      await expect(deleteAccount(uid, id)).resolves.toEqual({
+        status: 'invalid'
+      })
+      expect(updateAccount).not.toHaveBeenCalled()
+      expect(update).not.toHaveBeenCalled()
+      expect(audit).not.toHaveBeenCalled()
+    })
+
+    it('should throw Boom.notFound when account not found', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findOne).mockResolvedValueOnce(deleteOtp)
+      jest
+        .mocked(updateAccount)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ matchedCount: 0, modifiedCount: 0 })
+
+      await expect(deleteAccount(uid, id)).rejects.toThrow(
+        Boom.notFound(`Account ${id} not found`)
+      )
+      expect(findOne).toHaveBeenCalledWith({
+        uid,
+        purpose: 'ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL',
+        verified: true,
+        consumed: false,
+        accountId: id
+      })
+    })
+
+    it('should throw Boom.badRequest when account found but not updated', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findOne).mockResolvedValueOnce(deleteOtp)
+      jest
+        .mocked(updateAccount)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ matchedCount: 1, modifiedCount: 0 })
+
+      await expect(deleteAccount(uid, id)).rejects.toThrow(
+        Boom.badRequest(`Account ${id} could not be deleted`)
+      )
+    })
+
+    it('should mark the account deleted, consume the OTP and audit the deletion', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findOne).mockResolvedValueOnce(deleteOtp)
+      jest
+        .mocked(updateAccount)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ matchedCount: 1, modifiedCount: 1 })
+      jest.mocked(update).mockResolvedValueOnce(true)
+
+      await expect(deleteAccount(uid, id)).resolves.toEqual({ status: 'valid' })
+
+      expect(updateAccount).toHaveBeenCalledWith(id, {
+        status: 'deleted',
+        updatedAt: expect.any(Date)
+      })
+      expect(update).toHaveBeenCalledWith(
+        {
+          uid,
+          purpose: 'ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL',
+          verified: true,
+          consumed: false,
+          accountId: id
+        },
+        { consumed: true }
+      )
+      expect(audit).toHaveBeenCalledWith({
+        event: 'AccountDeleted',
+        accountId: id,
+        email
+      })
     })
   })
 })
