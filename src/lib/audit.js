@@ -6,7 +6,11 @@ import { audit } from '@defra/cdp-auditing'
  * record, so downstream consumers can filter on it.
  */
 export const AUDIT_EVENT = {
+  ACCOUNT_DELETED: 'AccountDeleted',
+  EMAIL_CHANGED: 'EmailChanged',
+  PHONE_CHANGED: 'PhoneChanged',
   OTP_ISSUED: 'OtpIssued',
+  OTP_LOCKED_OUT: 'OtpLockedOut',
   SIGN_IN: 'SignIn',
   SIGN_OUT: 'SignOut',
   REGISTRATION: 'Registration'
@@ -44,10 +48,58 @@ function auditAccountEvent(event, accountId, email, fields = {}) {
  * request, so a resend is its own event — the trail shows how many codes
  * went to an address and for which interaction.
  * @param {string} uid - the interaction the code belongs to
- * @param {string} email - the address the code was sent to
+ * @param {string} email - the address the code was sent to (or account email if sent to phone)
+ * @param {string} [phone] - the phone number the code was sent to
  */
-export function auditOtpIssued(uid, email) {
-  auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+export function auditOtpIssued(uid, email, phone) {
+  if (phone) {
+    auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid, phone })
+  } else {
+    auditEvent(AUDIT_EVENT.OTP_ISSUED, email, { uid })
+  }
+}
+
+/**
+ * A user changed their email address (on their logged-in account)
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} oldEmail - the old email address
+ * @param {string} newEmail - the new email address
+ */
+export function auditEmailChanged(accountId, oldEmail, newEmail) {
+  auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, newEmail, {
+    oldEmail,
+    newEmail
+  })
+}
+
+/**
+ * A user changed their phone number (on their logged-in account)
+ * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
+ * @param {string} email - the email address
+ * @param {string} oldPhone - the old phone number
+ * @param {string} newPhone - the new phone number
+ */
+export function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
+  auditAccountEvent(AUDIT_EVENT.PHONE_CHANGED, accountId, email, {
+    oldPhone,
+    newPhone
+  })
+}
+
+/**
+ * An email address asked for more codes than the limit allows and is now
+ * locked out. Recorded once, when the lockout starts: the requests refused
+ * while it holds leave no OtpIssued record, so the trail reads as the
+ * lockout followed by silence.
+ * @param {string} uid - the interaction the limit was reached on
+ * @param {string} email - the address that is locked out
+ * @param {Date} lockedUntil - when the address may request a code again
+ */
+export function auditOtpLockout(uid, email, lockedUntil) {
+  auditEvent(AUDIT_EVENT.OTP_LOCKED_OUT, email, {
+    uid,
+    lockedUntil: lockedUntil.toISOString()
+  })
 }
 
 /**
@@ -78,4 +130,13 @@ export function auditSignOut(accountId, email) {
  */
 export function auditRegistration(accountId, email, phone) {
   auditAccountEvent(AUDIT_EVENT.REGISTRATION, accountId, email, { phone })
+}
+
+/**
+ * An account was deleed
+ * @param {string} accountId
+ * @param {string} email
+ */
+export function auditAccountDeleted(accountId, email) {
+  auditAccountEvent(AUDIT_EVENT.ACCOUNT_DELETED, accountId, email)
 }

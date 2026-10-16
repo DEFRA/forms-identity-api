@@ -20,6 +20,13 @@ process.env.HTTP_PROXY = ''
 process.env.NOTIFY_API_KEY =
   'test_key-zzzzzzzz-zzzz-zzzz-zzzz-servicezzzzz-zzzzzzzz-zzzz-zzzz-zzzz-apikeyzzzzzz'
 process.env.NOTIFY_OTP_TEMPLATE_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
+process.env.NOTIFY_OTP_SMS_TEMPLATE_ID = 'ssssssss-ssss-ssss-ssss-ssssssssssss'
 process.env.NOTIFY_REPLY_TO_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-replytozzzzz'
-
 process.env.TRACING_HEADER = 'x-cdp-request-id'
+
+// Pinned to the config defaults so a developer's local .env (which dotenv
+// loads but will not override) cannot change the limits the tests assert on
+process.env.OTP_LOCKOUT_MAX_REQUESTS = '5'
+process.env.OTP_LOCKOUT_WINDOW_SECONDS = '7200'
+process.env.OTP_LOCKOUT_DURATION_SECONDS = '7200'
+process.env.OTP_TEST_READ_SECRET = 'a-test-secret-of-32-characters-x'

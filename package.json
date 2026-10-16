@@ -33,6 +33,11 @@
     "start": "NODE_ENV=${NODE_ENV:-production} node --enable-source-maps ./.server",
     "setup:husky": "node -e \"try { (await import('husky')).default() } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') throw e }\" --input-type module"
   },
+  "config": {
+    "mongodbMemoryServer": {
+      "version": "6.0.14"
+    }
+  },
   "dependencies": {
     "@aws-sdk/credential-providers": "^3.1116.0",
     "@defra/cdp-auditing": "0.6.1",

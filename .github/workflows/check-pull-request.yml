@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: npm-install-cache
         with:
           enableCrossOsArchive: true
@@ -31,7 +31,7 @@ jobs:
           path: node_modules
 
       - name: Cache build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           enableCrossOsArchive: true
           key: npm-build-${{ runner.os }}-${{ github.sha }}
@@ -45,6 +45,11 @@ jobs:
       - name: Install dependencies
         if: steps.npm-install-cache.outputs.cache-hit != 'true'
         run: npm ci
+        env:
+          # Skip the mongod pre-download. It would land in this runner's home
+          # cache, which no later job sees; the test job copies the binary from
+          # the mongo image instead
+          MONGOMS_DISABLE_POSTINSTALL: 1
 
       - name: Run build
         run: npm run build
@@ -88,7 +93,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Restore dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -97,7 +102,7 @@ jobs:
 
       - name: Cache task
         if: ${{ matrix.task.cache }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           enableCrossOsArchive: true
           key: ${{ matrix.task.name }}-${{ runner.os }}
@@ -131,7 +136,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Restore dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -139,7 +144,7 @@ jobs:
           path: node_modules
 
       - name: Restore build
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -153,27 +158,32 @@ jobs:
 
       - name: Cache task
         if: ${{ matrix.task.cache }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           enableCrossOsArchive: true
           key: ${{ matrix.task.name }}-${{ runner.os }}-${{ github.sha }}
           path: ${{ matrix.task.cache }}
 
-      # The integration suites run mongodb-memory-server, which downloads a
-      # mongod binary on first use. The version in the key follows
-      # MONGO_VERSION in test/helpers/mongo-memory.js
-      - name: Cache MongoDB binary
-        uses: actions/cache@v4
-        with:
-          key: mongodb-binaries-${{ runner.os }}-6.0.14
-          path: ~/.cache/mongodb-binaries
+      # The integration suites run mongodb-memory-server, which otherwise
+      # downloads a mongod binary from fastdl.mongodb.org. Downloads from
+      # GitHub runners are unreliable, so copy the binary out of the official
+      # image instead (the container is never started). The image tag is read
+      # from config.mongodbMemoryServer.version in package.json, the same value
+      # mongodb-memory-server uses, so the two cannot drift apart
+      - name: Provide MongoDB binary
+        run: |
+          MONGO_VERSION=$(node -p "require('./package.json').config.mongodbMemoryServer.version")
+          docker create --name mongo-binary "mongo:$MONGO_VERSION"
+          docker cp mongo-binary:/usr/bin/mongod "$RUNNER_TEMP/mongod"
+          docker rm mongo-binary
+          echo "MONGOMS_SYSTEM_BINARY=$RUNNER_TEMP/mongod" >> "$GITHUB_ENV"
 
       - name: Run task
         run: ${{ matrix.task.run }}
 
       - name: Save test coverage
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.task.description }} coverage
           path: coverage
@@ -192,7 +202,7 @@ jobs:
           fetch-depth: 0
 
       - name: Restore unit test coverage
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           enableCrossOsArchive: true
           fail-on-cache-miss: true
@@ -200,7 +210,7 @@ jobs:
           path: coverage
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v6
+        uses: SonarSource/sonarqube-scan-action@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

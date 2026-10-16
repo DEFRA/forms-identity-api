@@ -1,43 +1,74 @@
 import Hapi from '@hapi/hapi'
 
+import accountRoutes from '~/src/routes/account.js'
+import otpRoutes from '~/src/routes/otp.js'
 import signinRoutes from '~/src/routes/signin.js'
+import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 import {
   completeSignup,
-  findAccountById,
-  findSigninEmail,
-  requestOtp,
-  verifyOtp
+  findAccountById
 } from '~/src/services/signin-service.js'
 
 jest.mock('~/src/services/signin-service.js', () => ({
-  requestOtp: jest.fn(),
-  verifyOtp: jest.fn(),
   completeSignup: jest.fn(),
   findAccountById: jest.fn(),
   findSigninEmail: jest.fn()
 }))
 
+jest.mock('~/src/services/otp-service.js', () => ({
+  requestOtp: jest.fn(),
+  verifyOtp: jest.fn(),
+  findOtp: jest.fn()
+}))
+
 /** Builds a server with the static routes (services are module-mocked) */
 async function buildServer() {
   const server = Hapi.server()
-  server.route(signinRoutes)
+  server.route([...accountRoutes, ...signinRoutes, ...otpRoutes])
   await server.initialize()
   return server
 }
 
 describe('signin routes', () => {
   it('POST /otp/request validates and delegates', async () => {
-    jest.mocked(requestOtp).mockResolvedValue(undefined)
+    jest.mocked(requestOtp).mockResolvedValue({ status: 'otp-issued' })
     const server = await buildServer()
 
     const res = await server.inject({
       method: 'POST',
       url: '/otp/request',
-      payload: { uid: 'uid-1', email: 'a@b.com' }
+      payload: { uid: 'uid-1', target: 'a@b.com' }
     })
 
-    expect(res.statusCode).toBe(204)
-    expect(requestOtp).toHaveBeenCalledWith('uid-1', 'a@b.com')
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({ status: 'otp-issued' })
+    expect(requestOtp).toHaveBeenCalledWith(
+      'uid-1',
+      'a@b.com',
+      'EMAIL',
+      'SIGNIN_VERIFY_EMAIL',
+      undefined
+    )
+  })
+
+  it('POST /otp/request passes a lockout through with the unlock time', async () => {
+    jest.mocked(requestOtp).mockResolvedValue({
+      status: 'locked-out',
+      lockedUntil: '2026-09-11T12:00:00.000Z'
+    })
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/otp/request',
+      payload: { uid: 'uid-1', target: 'a@b.com' }
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.payload)).toEqual({
+      status: 'locked-out',
+      lockedUntil: '2026-09-11T12:00:00.000Z'
+    })
   })
 
   it('POST /otp/request surfaces a delivery failure as a 500', async () => {
@@ -47,7 +78,7 @@ describe('signin routes', () => {
     const res = await server.inject({
       method: 'POST',
       url: '/otp/request',
-      payload: { uid: 'uid-1', email: 'a@b.com' }
+      payload: { uid: 'uid-1', target: 'a@b.com' }
     })
 
     expect(res.statusCode).toBe(500)
@@ -59,7 +90,10 @@ describe('signin routes', () => {
     const res = await server.inject({
       method: 'POST',
       url: '/otp/request',
-      payload: { uid: 'uid-1', email: 'not-an-email' }
+      payload: {
+        uid: 'uid-1',
+        target: 'not-an-email'
+      }
     })
 
     expect(res.statusCode).toBe(400)
@@ -96,7 +130,12 @@ describe('signin routes', () => {
         payload: { uid: 'uid-1', code }
       })
       expect(res.statusCode).toBe(200)
-      expect(verifyOtp).toHaveBeenLastCalledWith('uid-1', code)
+      expect(verifyOtp).toHaveBeenLastCalledWith(
+        'uid-1',
+        code,
+        'SIGNIN_VERIFY_EMAIL',
+        undefined
+      )
     }
   })
 
@@ -111,6 +150,22 @@ describe('signin routes', () => {
 
     expect(res.statusCode).toBe(400)
     expect(completeSignup).not.toHaveBeenCalled()
+  })
+
+  it('POST /accounts passes an Ofcom fictional number to the service (its rule)', async () => {
+    jest
+      .mocked(completeSignup)
+      .mockResolvedValue({ status: 'signed-in', accountId: 'acc-2' })
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/accounts',
+      payload: { uid: 'uid-1', phone: '07700900000' }
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(completeSignup).toHaveBeenCalledWith('uid-1', '07700900000')
   })
 
   it('POST /accounts passes real-but-non-mobile numbers to the service (its rule)', async () => {
@@ -143,23 +198,37 @@ describe('signin routes', () => {
     expect(completeSignup).toHaveBeenCalledWith('uid-1', '07911 123456')
   })
 
-  it('GET /otp/{uid} returns the display email', async () => {
-    jest.mocked(findSigninEmail).mockResolvedValue('a@b.com')
+  it('GET /otp/{uid}/{purpose} returns the OTP details', async () => {
+    jest.mocked(findOtp).mockResolvedValue({
+      consumed: false,
+      verified: false,
+      target: 'a@b.com'
+    })
     const server = await buildServer()
 
-    const res = await server.inject({ method: 'GET', url: '/otp/uid-1' })
+    const res = await server.inject({
+      method: 'GET',
+      url: '/otp/uid-1/SIGNIN_VERIFY_EMAIL'
+    })
 
     expect(res.statusCode).toBe(200)
-    expect(JSON.parse(res.payload)).toEqual({ email: 'a@b.com' })
-    expect(findSigninEmail).toHaveBeenCalledWith('uid-1')
+    expect(JSON.parse(res.payload)).toEqual({
+      consumed: false,
+      verified: false,
+      target: 'a@b.com'
+    })
+    expect(findOtp).toHaveBeenCalledWith('uid-1', 'SIGNIN_VERIFY_EMAIL')
   })
 
-  it('GET /otp/{uid} returns 404 when no code has been requested', async () => {
+  it('GET /otp/{uid}/{purpose} returns 404 when no code has been requested', async () => {
     const Boom = jest.requireActual('@hapi/boom')
-    jest.mocked(findSigninEmail).mockRejectedValue(Boom.notFound())
+    jest.mocked(findOtp).mockRejectedValue(Boom.notFound())
     const server = await buildServer()
 
-    const res = await server.inject({ method: 'GET', url: '/otp/uid-none' })
+    const res = await server.inject({
+      method: 'GET',
+      url: '/otp/uid-none/SIGNIN_VERIFY_EMAIL'
+    })
 
     expect(res.statusCode).toBe(404)
   })

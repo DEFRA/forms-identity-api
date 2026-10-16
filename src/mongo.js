@@ -7,6 +7,8 @@ const isSecureContextEnabled = config.get('isSecureContextEnabled')
 
 export const ACCOUNTS_COLLECTION_NAME = 'accounts'
 export const OTPS_COLLECTION_NAME = 'otps'
+export const OTP_LOCKOUTS_COLLECTION_NAME = 'otp-lockouts'
+export const TEST_OTPS_COLLECTION_NAME = 'test-otps'
 
 /**
  * oidc-provider artifact collections (one snake_cased collection per model,
@@ -85,21 +87,76 @@ export async function prepareDb(logger) {
 }
 
 /**
+ * @param {Db} database
+ */
+async function hasOldIndexOnAccountsEmail(database) {
+  const collections = await database
+    .listCollections({ name: ACCOUNTS_COLLECTION_NAME }, { nameOnly: true })
+    .toArray()
+
+  if (collections.length === 0) {
+    return false
+  }
+
+  const indexes = await database
+    .collection(ACCOUNTS_COLLECTION_NAME)
+    .listIndexes()
+    .toArray()
+
+  // Check if an index exists where the key is { email: 1 } and it doesn't have a partial filter expression
+  return indexes.some((index) => {
+    return (
+      index.key?.email === 1 &&
+      Object.keys(index.key).length === 1 &&
+      index.unique === true &&
+      !index.partialFilterExpression
+    )
+  })
+}
+
+/**
  * Creates the collection indexes (idempotent — createIndex is a no-op when
  * the index already exists). TTL indexes are GC only: expiry correctness is
  * enforced in-app because Mongo's TTL sweep is lazy and best-effort.
  * @param {Db} database
  */
 export async function createIndexes(database) {
-  await database
-    .collection(ACCOUNTS_COLLECTION_NAME)
-    .createIndex({ email: 1 }, { unique: true })
+  if (await hasOldIndexOnAccountsEmail(database)) {
+    await database.collection(ACCOUNTS_COLLECTION_NAME).dropIndex('email_1')
+  }
+  // Only active accounts need unique email addresses; deleted accounts may
+  // retain their email address.
+  await database.collection(ACCOUNTS_COLLECTION_NAME).createIndex(
+    { email: 1 },
+    {
+      unique: true,
+      partialFilterExpression: { status: 'active' }
+    }
+  )
 
   await database
     .collection(OTPS_COLLECTION_NAME)
     .createIndex({ uid: 1, purpose: 1 }, { unique: true })
   await database
     .collection(OTPS_COLLECTION_NAME)
+    .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
+
+  await database
+    .collection(OTP_LOCKOUTS_COLLECTION_NAME)
+    .createIndex({ target: 1 }, { unique: true })
+  await database
+    .collection(OTP_LOCKOUTS_COLLECTION_NAME)
+    .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
+
+  // one record per test address and purpose, so a new code replaces the
+  // earlier one for that purpose
+  await database
+    .collection(TEST_OTPS_COLLECTION_NAME)
+    .createIndex({ target: 1, purpose: 1 }, { unique: true })
+  // expireAt is the expiry of the code itself, so Mongo deletes the plain
+  // text when the code can no longer sign anyone in
+  await database
+    .collection(TEST_OTPS_COLLECTION_NAME)
     .createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 })
 
   for (const name of OIDC_COLLECTION_NAMES) {
