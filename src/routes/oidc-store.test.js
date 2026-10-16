@@ -208,52 +208,118 @@ describe('oidc store routes', () => {
     expect(auditSignOut).not.toHaveBeenCalled()
   })
 
-  it('audits a sign-out when a session that held an account is destroyed', async () => {
-    jest.mocked(destroy).mockResolvedValue({ accountId: 'acc-1', uid: 'u-1' })
-    jest
-      .mocked(accountsRepository.findById)
-      .mockResolvedValue(
-        /** @type {never} */ ({ _id: 'acc-1', email: 'citizen@example.com' })
-      )
-    const server = await buildServer()
+  describe('session destroy', () => {
+    const GRACE_MS = 3000
 
-    const res = await server.inject({
-      method: 'DELETE',
-      url: '/oidc/session/id-4'
+    beforeEach(() => {
+      // Only setTimeout is faked: hapi's inject relies on the other timers
+      jest.useFakeTimers({
+        doNotFake: [
+          'Date',
+          'hrtime',
+          'nextTick',
+          'performance',
+          'queueMicrotask',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+          'requestIdleCallback',
+          'cancelIdleCallback',
+          'setImmediate',
+          'clearImmediate',
+          'setInterval',
+          'clearInterval'
+        ]
+      })
+      jest.mocked(destroy).mockResolvedValue({ accountId: 'acc-1', uid: 'u-1' })
+      jest
+        .mocked(accountsRepository.findById)
+        .mockResolvedValue(
+          /** @type {never} */ ({ _id: 'acc-1', email: 'citizen@example.com' })
+        )
     })
 
-    expect(res.statusCode).toBe(204)
-    expect(accountsRepository.findById).toHaveBeenCalledWith('acc-1')
-    expect(auditSignOut).toHaveBeenCalledWith('acc-1', 'citizen@example.com')
-  })
-
-  it('does not audit a sign-out for a session that never signed in', async () => {
-    jest.mocked(destroy).mockResolvedValue({ uid: 'u-1' })
-    const server = await buildServer()
-
-    const res = await server.inject({
-      method: 'DELETE',
-      url: '/oidc/session/id-5'
+    afterEach(() => {
+      jest.useRealTimers()
     })
 
-    expect(res.statusCode).toBe(204)
-    expect(accountsRepository.findById).not.toHaveBeenCalled()
-    expect(auditSignOut).not.toHaveBeenCalled()
-  })
+    /** Destroys a session and lets the grace period elapse */
+    async function destroySession() {
+      const server = await buildServer()
+      const res = await server.inject({
+        method: 'DELETE',
+        url: '/oidc/session/id-4'
+      })
+      expect(res.statusCode).toBe(204)
+      await jest.advanceTimersByTimeAsync(GRACE_MS)
+    }
 
-  it('does not audit a sign-out for a session that where the account is not found', async () => {
-    jest.mocked(destroy).mockResolvedValue({ accountId: 'acc-1', uid: 'u-1' })
-    jest.mocked(accountsRepository.findById).mockResolvedValue(null)
-    const server = await buildServer()
+    it('audits a sign-out when a signed-in session is destroyed and not replaced', async () => {
+      jest.mocked(findByUid).mockResolvedValue(null)
 
-    const res = await server.inject({
-      method: 'DELETE',
-      url: '/oidc/session/id-5'
+      await destroySession()
+
+      expect(findByUid).toHaveBeenCalledWith('session', 'u-1')
+      expect(accountsRepository.findById).toHaveBeenCalledWith('acc-1')
+      expect(auditSignOut).toHaveBeenCalledWith('acc-1', 'citizen@example.com')
     })
 
-    expect(res.statusCode).toBe(204)
-    expect(accountsRepository.findById).toHaveBeenCalled()
-    expect(auditSignOut).not.toHaveBeenCalled()
+    it('does not audit before the grace period has elapsed', async () => {
+      jest.mocked(findByUid).mockResolvedValue(null)
+      const server = await buildServer()
+
+      await server.inject({ method: 'DELETE', url: '/oidc/session/id-4' })
+      await jest.advanceTimersByTimeAsync(GRACE_MS - 1)
+
+      expect(auditSignOut).not.toHaveBeenCalled()
+    })
+
+    it('does not audit when the session id was rotated for the same account', async () => {
+      jest
+        .mocked(findByUid)
+        .mockResolvedValue({ accountId: 'acc-1', uid: 'u-1' })
+
+      await destroySession()
+
+      expect(auditSignOut).not.toHaveBeenCalled()
+    })
+
+    it('audits a sign-out when the session was replaced by another account', async () => {
+      jest
+        .mocked(findByUid)
+        .mockResolvedValue({ accountId: 'acc-2', uid: 'u-1' })
+
+      await destroySession()
+
+      expect(auditSignOut).toHaveBeenCalledWith('acc-1', 'citizen@example.com')
+    })
+
+    it('does not audit a sign-out for a session that never signed in', async () => {
+      jest.mocked(destroy).mockResolvedValue({ uid: 'u-1' })
+
+      await destroySession()
+
+      expect(findByUid).not.toHaveBeenCalled()
+      expect(accountsRepository.findById).not.toHaveBeenCalled()
+      expect(auditSignOut).not.toHaveBeenCalled()
+    })
+
+    it('does not audit a sign-out when the account is not found', async () => {
+      jest.mocked(findByUid).mockResolvedValue(null)
+      jest.mocked(accountsRepository.findById).mockResolvedValue(null)
+
+      await destroySession()
+
+      expect(accountsRepository.findById).toHaveBeenCalled()
+      expect(auditSignOut).not.toHaveBeenCalled()
+    })
+
+    it('does not fail the request when the deferred check errors', async () => {
+      jest.mocked(findByUid).mockRejectedValue(new Error('db down'))
+
+      await destroySession()
+
+      expect(auditSignOut).not.toHaveBeenCalled()
+    })
   })
 
   it('does not audit a sign-out when destroying a non-session model', async () => {

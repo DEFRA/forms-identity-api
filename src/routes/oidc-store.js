@@ -1,6 +1,7 @@
 import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
+import { logger } from '~/src/helpers/logging/logger.js'
 import { auditSignOut } from '~/src/lib/audit.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import {
@@ -19,6 +20,12 @@ const SESSION_MODEL = 'session'
 /** One artefact by model and id — the same address for read, write and delete */
 const MODEL_ID_PATH = '/oidc/{model}/{id}'
 
+/**
+ * How long to wait, after a signed-in session is destroyed, for the provider
+ * to store its replacement before treating the destroy as a sign-out
+ */
+const SESSION_ROTATION_GRACE_MS = 3000
+
 const modelParam = Joi.string()
   .valid(...MODEL_COLLECTIONS)
   .required()
@@ -27,6 +34,43 @@ const modelIdParams = Joi.object({
   model: modelParam,
   id: Joi.string().required()
 })
+
+/**
+ * oidc-provider also destroys a session when it merely rotates the session
+ * id (on every login, and on a client-only logout): the old record is
+ * deleted and one carrying the same `uid` is stored straight after. That is
+ * not a sign-out, so the audit waits briefly and only fires if the account
+ * is no longer signed in on that `uid`.
+ * @param {string} accountId
+ * @param {string} [uid]
+ */
+function scheduleSignOutAudit(accountId, uid) {
+  const timer = setTimeout(() => {
+    auditIfSignedOut(accountId, uid).catch((/** @type {unknown} */ err) => {
+      logger.error(err, 'Failed to audit sign-out')
+    })
+  }, SESSION_ROTATION_GRACE_MS)
+
+  timer.unref()
+}
+
+/**
+ * @param {string} accountId
+ * @param {string} [uid]
+ */
+async function auditIfSignedOut(accountId, uid) {
+  const replacement = uid ? await findByUid(SESSION_MODEL, uid) : null
+
+  if (replacement?.accountId === accountId) {
+    return
+  }
+
+  const account = await accountsRepository.findById(accountId)
+
+  if (account) {
+    auditSignOut(account._id, account.email)
+  }
+}
 
 /**
  * Persistence endpoints backing forms-identity-ui's oidc-provider HTTP
@@ -131,16 +175,11 @@ export default [
       const { model, id } = request.params
       const payload = await destroy(model, id)
 
-      // A session's end is a sign-out, but only when it actually held an
-      // account (oidc-provider also destroys sessions that never signed in)
       if (model === SESSION_MODEL && payload?.accountId) {
-        const account = await accountsRepository.findById(
-          /** @type {string} */ (payload.accountId)
+        scheduleSignOutAudit(
+          /** @type {string} */ (payload.accountId),
+          /** @type {string | undefined} */ (payload.uid)
         )
-
-        if (account) {
-          auditSignOut(account._id, account.email)
-        }
       }
 
       return h.response().code(StatusCodes.NO_CONTENT)
