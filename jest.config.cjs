@@ -40,6 +40,7 @@ module.exports = {
   transformIgnorePatterns: [
     `node_modules/(?!${[
       '@defra/cdp-auditing', // Supports ESM only
+      '@defra/forms-common', // Supports ESM only
       '@defra/hapi-tracing' // Supports ESM only
     ].join('|')}/)`
   ]
