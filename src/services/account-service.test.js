@@ -11,6 +11,7 @@ import {
 import { findOne, update } from '~/src/repositories/otps-repository.js'
 import {
   deleteAccount,
+  recordSignOut,
   updateEmail,
   updatePhone
 } from '~/src/services/account-service.js'
@@ -409,6 +410,30 @@ describe('account service', () => {
         accountId: id,
         email
       })
+    })
+  })
+
+  describe('recordSignOut', () => {
+    it('audits a sign-out for the account', async () => {
+      jest
+        .mocked(findById)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ _id: id, email })
+
+      await recordSignOut(id)
+
+      expect(audit).toHaveBeenCalledWith({
+        event: 'SignOut',
+        accountId: id,
+        email
+      })
+    })
+
+    it('throws not found, without auditing, when the account is unknown', async () => {
+      jest.mocked(findById).mockResolvedValueOnce(null)
+
+      await expect(recordSignOut(id)).rejects.toThrow(`Account ${id} not found`)
+      expect(audit).not.toHaveBeenCalled()
     })
   })
 })

@@ -4,7 +4,8 @@ import { PURPOSE, STATUS } from '~/src/constants.js'
 import {
   auditAccountDeleted,
   auditEmailChanged,
-  auditPhoneChanged
+  auditPhoneChanged,
+  auditSignOut
 } from '~/src/lib/audit.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
@@ -205,8 +206,24 @@ export async function deleteAccount(uid, id) {
   })
 
   auditAccountDeleted(id, otpEmail.target)
+  auditSignOut(id, otpEmail.target)
 
   return { status: STATUS.VALID }
+}
+
+/**
+ * Records that an account's session has ended (sign-out).
+ * @param {string} id - the account `_id`, which is also the OIDC `sub`
+ * @throws {Boom.Boom} Throws a Boom error if the account is not found.
+ */
+export async function recordSignOut(id) {
+  const account = await accountsRepository.findById(id)
+
+  if (!account) {
+    throw Boom.notFound(`Account ${id} not found`)
+  }
+
+  auditSignOut(account._id, account.email)
 }
 
 /**

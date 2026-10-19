@@ -1,8 +1,10 @@
+import { StatusCodes } from 'http-status-codes'
 import Joi from 'joi'
 
 import { telephoneSchema } from '~/src/lib/telephone.js'
 import {
   deleteAccount,
+  recordSignOut,
   updateEmail,
   updatePhone
 } from '~/src/services/account-service.js'
@@ -28,6 +30,21 @@ export default /** @type {ServerRoute[]} */ (
         const account = await findAccountById(id)
 
         return { id: account._id, email: account.email, phone: account.phone }
+      }
+    }),
+    /** @type {ServerRoute<{ Params: { id: string } }>} */
+    ({
+      method: 'POST',
+      path: '/accounts/{id}/sign-out',
+      options: {
+        validate: {
+          params: Joi.object({ id: Joi.string().required() })
+        }
+      },
+      async handler(request, h) {
+        await recordSignOut(request.params.id)
+
+        return h.response().code(StatusCodes.NO_CONTENT)
       }
     }),
     /** @type {ServerRoute<{ Params: { uid: string, id: string } }>} */
