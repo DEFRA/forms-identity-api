@@ -25,6 +25,20 @@ const LOCKOUT_WINDOW_MS = config.get('otp.lockout.windowSeconds') * 1000
 const LOCKOUT_MS = config.get('otp.lockout.durationSeconds') * 1000
 
 /**
+ * argon2id cost for a code hash, at the OWASP minimum. A code is random,
+ * short-lived and has an attempt limit, so this cost is sufficient. Uses
+ * about 1/5 of the work of the library default, as of argon2 v0.45.1.
+ * @see https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id
+ * @type {HashOptions}
+ */
+const CODE_HASH_OPTIONS = {
+  type: argon2.argon2id,
+  memoryCost: 19456,
+  timeCost: 2,
+  parallelism: 1
+}
+
+/**
  * @typedef {{ codeHash: string, uid: string, purpose: PurposeType, verified: boolean, consumed: boolean, accountId?: string }} ClaimType
  */
 
@@ -117,7 +131,7 @@ export async function requestOtp(
   }
 
   const code = generateCode()
-  const codeHash = await argon2.hash(code)
+  const codeHash = await argon2.hash(code, CODE_HASH_OPTIONS)
   const expireAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000)
 
   await otpsRepository.upsert(
@@ -466,6 +480,7 @@ export async function findOtp(uid, purpose) {
 
 /**
  * @import { Filter, WithId } from 'mongodb'
+ * @import { HashOptions } from 'argon2'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
  * @import { OtpLockoutDocument } from '~/src/repositories/otp-lockouts-repository.js'
  * @import { PurposeType } from '~/src/constants.js'
