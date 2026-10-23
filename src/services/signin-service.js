@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import { setUserId } from '@defra/forms-common'
 import Boom from '@hapi/boom'
 
 import { PURPOSE, STATUS } from '~/src/constants.js'
@@ -52,6 +53,7 @@ export async function completeSignup(uid, phone) {
     return { status: STATUS.INVALID } // a concurrent submit already completed
   }
 
+  setUserId(account._id)
   auditRegistration(account._id, account.email, account.phone)
   auditSignIn(account._id, account.email, uid)
 
