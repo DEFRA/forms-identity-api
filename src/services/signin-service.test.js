@@ -248,6 +248,21 @@ describe('signin service', () => {
       await expect(argon2.verify(doc.codeHash, code)).resolves.toBe(true)
     })
 
+    it('hashes the code with argon2id at the OWASP minimum cost', async () => {
+      const storedOtps = build()
+
+      await requestOtp(
+        'uid-1',
+        'a@b.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.SIGNIN_VERIFY_EMAIL
+      )
+
+      expect(storedOtps[0].codeHash).toMatch(
+        /^\$argon2id\$v=19\$m=19456,p=1,t=2\$/
+      )
+    })
+
     it('issues six digit codes across the whole range, zeros included', async () => {
       // the leading zero is part of the code: it is what gets hashed and what
       // the email shows. Hashing is stubbed only because argon2 is slow.

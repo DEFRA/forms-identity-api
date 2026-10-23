@@ -3,6 +3,7 @@ import Hapi from '@hapi/hapi'
 import accountRoutes from '~/src/routes/account.js'
 import {
   deleteAccount,
+  recordSignOut,
   updateEmail,
   updatePhone
 } from '~/src/services/account-service.js'
@@ -18,6 +19,18 @@ async function buildServer() {
 }
 
 describe('account routes', () => {
+  it('POST /accounts/id/sign-out records the sign-out and answers 204', async () => {
+    const server = await buildServer()
+
+    const res = await server.inject({
+      method: 'POST',
+      url: '/accounts/acc-id/sign-out'
+    })
+
+    expect(res.statusCode).toBe(204)
+    expect(recordSignOut).toHaveBeenCalledWith('acc-id')
+  })
+
   it('PATCH /accounts/uid/id/email validates and delegates', async () => {
     jest.mocked(updateEmail).mockResolvedValueOnce({ status: 'valid' })
 
