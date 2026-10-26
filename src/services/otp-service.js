@@ -1,3 +1,4 @@
+import { setUserId } from '@defra/forms-common'
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
@@ -391,6 +392,7 @@ async function handleWhenAccountExists(
       return failResult // concurrently spent or superseded by a resend
     }
 
+    setUserId(account._id)
     auditSignIn(account._id, account.email, uid)
     return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
