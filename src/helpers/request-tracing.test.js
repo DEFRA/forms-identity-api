@@ -1,6 +1,10 @@
 import {
+  REFERENCE_NUMBER_HEADER,
+  SESSION_ID_HEADER,
   USER_ID_HEADER,
   getCorrelationId,
+  getReferenceNumber,
+  getSessionId,
   getUserId
 } from '@defra/forms-common'
 import { getTraceId } from '@defra/hapi-tracing'
@@ -15,6 +19,8 @@ describe('request-tracing', () => {
   const tracingHeader = 'x-cdp-request-id'
   const correlationId = '1066e8cc-8e1e-4671-8ad7-b4cd9c95bb94'
   const userId = '86758ba9-92e7-4287-9751-7705e449f0a5'
+  const sessionId = 'c3a2e5f4-2b8e-4e1f-9a8d-3f6b7c1d2e9a'
+  const referenceNumber = 'ABC-123-DEF'
 
   describe('plugin', () => {
     /** @type {Server} */
@@ -93,6 +99,29 @@ describe('request-tracing', () => {
         userId
       })
       expect(responseContext).toEqual({ correlationId, userId })
+    })
+
+    it('should add the session ID and reference number sent by the calling service', async () => {
+      server.route({
+        method: 'GET',
+        path: '/log-context',
+        handler: () => ({
+          sessionId: getSessionId(),
+          referenceNumber: getReferenceNumber()
+        })
+      })
+
+      const { result } = await server.inject({
+        method: 'GET',
+        url: '/log-context',
+        headers: {
+          [tracingHeader]: correlationId,
+          [SESSION_ID_HEADER]: sessionId,
+          [REFERENCE_NUMBER_HEADER]: referenceNumber
+        }
+      })
+
+      expect(result).toEqual({ sessionId, referenceNumber })
     })
 
     it('should ignore the user ID sent to a route without authentication', async () => {
