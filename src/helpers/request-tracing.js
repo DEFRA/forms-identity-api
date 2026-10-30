@@ -25,8 +25,9 @@ export function getRequestUserId(request) {
 
 /**
  * Starts a log context for every request, holding the correlation ID from the
- * tracing header (or a new ID when the caller sent none) and the account ID
- * of the user. The logger writes both on every log line.
+ * tracing header (or a new ID when the caller sent none), the account ID of
+ * the user, and the session ID and form reference number sent by the calling
+ * forms service. The logger writes them on every log line.
  * @satisfies {ServerRegisterPluginObject<RequestTracingOptions>}
  */
 export const requestTracing = {
@@ -34,7 +35,8 @@ export const requestTracing = {
   options: {
     tracingHeader,
     tracingPlugin: tracing.plugin,
-    getUserId: getRequestUserId
+    getUserId: getRequestUserId,
+    readLogContextHeaders: true
   }
 }
 
