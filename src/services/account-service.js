@@ -210,6 +210,8 @@ export async function deleteAccount(uid, id) {
   await otpsRepository.update(filterEmailOtp, {
     consumed: true
   })
+  // Clear any previous OTP requests from the same email
+  await clearRequestCount(otpEmail.target)
 
   auditAccountDeleted(id, otpEmail.target)
   auditSignOut(id, otpEmail.target)
