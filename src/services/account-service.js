@@ -90,7 +90,7 @@ export async function updateEmail(uid, id) {
   })
   // Clear any previous OTP requests from the same email/phone
   await clearRequestCount(otpPhone.target)
-  await clearRequestCount(oldEmail)
+  await clearRequestCount(newEmail)
 
   auditEmailChanged(account._id, oldEmail, newEmail)
 
