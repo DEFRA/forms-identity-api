@@ -23,6 +23,7 @@ jest.mock('~/src/repositories/accounts-repository.js', () => ({
   update: jest.fn()
 }))
 jest.mock('~/src/repositories/otps-repository.js')
+jest.mock('~/src/repositories/otp-lockouts-repository.js')
 jest.mock('@defra/cdp-auditing')
 
 describe('account service', () => {

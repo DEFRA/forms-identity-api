@@ -10,6 +10,7 @@ import {
 import { normaliseMobile } from '~/src/lib/phone.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
+import { clearRequestCount } from '~/src/services/otp-service.js'
 import { isTestAddress } from '~/src/services/test-otp-service.js'
 
 /**
@@ -87,6 +88,9 @@ export async function updateEmail(uid, id) {
   await otpsRepository.update(filterPhoneOtp, {
     consumed: true
   })
+  // Clear any previous OTP requests from the same email/phone
+  await clearRequestCount(otpPhone.target)
+  await clearRequestCount(oldEmail)
 
   auditEmailChanged(account._id, oldEmail, newEmail)
 
@@ -150,6 +154,8 @@ export async function updatePhone(uid, id, phone) {
   await otpsRepository.update(filterEmailOtp, {
     consumed: true
   })
+  // Clear any previous OTP requests from the same email
+  await clearRequestCount(otpEmail.target)
 
   auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
 
