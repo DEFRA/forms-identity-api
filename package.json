@@ -14,8 +14,8 @@
   "scripts": {
     "build": "npm run build:server",
     "build:server": "babel --delete-dir-on-start --ignore \"**/*.test.js\" --copy-files --no-copy-ignored --keep-file-extension --source-maps --out-dir ./.server ./src",
-    "dev": "npm run server:watch:dev",
-    "dev:debug": "npm run server:watch:debug",
+    "dev": "AWS_EMF_ENVIRONMENT=Local npm run server:watch:dev",
+    "dev:debug": "AWS_EMF_ENVIRONMENT=Local npm run server:watch:debug",
     "format": "prettier --write \"**/*.{cjs,js,json,md,mjs}\"",
     "format:check": "prettier --check \"**/*.{cjs,js,json,md,mjs}\"",
     "postinstall": "npm run setup:husky",
@@ -41,6 +41,7 @@
   "dependencies": {
     "@aws-sdk/credential-providers": "^3.1116.0",
     "@defra/cdp-auditing": "0.6.1",
+    "@defra/cdp-metrics": "0.6.1",
     "@defra/forms-common": "^0.1.6",
     "@defra/hapi-tracing": "^1.30.0",
     "@elastic/ecs-pino-format": "^1.5.0",

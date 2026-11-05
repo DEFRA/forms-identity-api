@@ -3,7 +3,14 @@ import { token } from '@hapi/jwt'
 import { postJson } from '~/src/lib/fetch.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 
+const mockCounter = jest.fn()
+
 jest.mock('~/src/lib/fetch.js')
+jest.mock('@defra/cdp-metrics', () => ({
+  Metrics: jest.fn(() => ({
+    counter: (/** @type {unknown[]} */ ...args) => mockCounter(...args)
+  }))
+}))
 
 // The uuids embedded in jest.setup.js's NOTIFY_API_KEY, asserted as literals
 // so the extraction offsets are verified rather than re-derived
@@ -78,6 +85,32 @@ describe('notify client', () => {
     expect(() => {
       token.verifySignature(artifacts, { key: SERVICE_ID, algorithm: 'HS256' })
     }).toThrow()
+  })
+
+  it('counts each email that Notify accepts', async () => {
+    await sendEmail('template-1', 'citizen@example.com', {})
+
+    expect(mockCounter).toHaveBeenCalledWith('notifySent', 1, {
+      channel: 'email'
+    })
+  })
+
+  it('counts each SMS that Notify accepts', async () => {
+    await sendSms('template-sms', '07507123456', {})
+
+    expect(mockCounter).toHaveBeenCalledWith('notifySent', 1, {
+      channel: 'sms'
+    })
+  })
+
+  it('does not count a message that Notify refuses', async () => {
+    jest.mocked(postJson).mockRejectedValueOnce(new Error('Notify refused'))
+
+    await expect(sendSms('template-sms', '07507123456', {})).rejects.toThrow(
+      'Notify refused'
+    )
+
+    expect(mockCounter).not.toHaveBeenCalled()
   })
 
   it('refuses to boot when no Notify API key is configured', async () => {

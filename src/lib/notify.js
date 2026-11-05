@@ -1,6 +1,8 @@
+import { Metrics } from '@defra/cdp-metrics'
 import { token } from '@hapi/jwt'
 
 import { config } from '~/src/config/index.js'
+import { logger } from '~/src/helpers/logging/logger.js'
 import { postJson } from '~/src/lib/fetch.js'
 
 const NOTIFICATIONS_BASE = 'https://api.notifications.service.gov.uk'
@@ -19,6 +21,8 @@ const SERVICE_ID_SUBSTRING_REDUCTION_2 = 37
 
 const apiKey = config.get('otp.notify.apiKey')
 const replyToId = config.get('otp.notify.replyToId')
+
+const metrics = new Metrics(logger)
 
 if (!apiKey) {
   // Fail loud at load (i.e. boot) rather than silently never deliver — the
@@ -60,6 +64,8 @@ export async function sendEmail(templateId, emailAddress, personalisation) {
       Authorization: 'Bearer ' + createToken(serviceId, apiKeyId)
     }
   })
+
+  await metrics.counter('notifySent', 1, { channel: 'email' })
 }
 
 /**
@@ -82,6 +88,8 @@ export async function sendSms(templateId, phoneNumber, personalisation) {
       Authorization: 'Bearer ' + createToken(serviceId, apiKeyId)
     }
   })
+
+  await metrics.counter('notifySent', 1, { channel: 'sms' })
 }
 
 /**
