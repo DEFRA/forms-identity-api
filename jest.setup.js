@@ -3,6 +3,7 @@ process.env.HOST = '0.0.0.0'
 process.env.PORT = '3010'
 process.env.SERVICE = 'forms-identity-api'
 process.env.SERVICE_VERSION = 'test'
+process.env.AWS_EMF_ENVIRONMENT = 'Local'
 
 process.env.LOG_ENABLED = 'false'
 process.env.LOG_LEVEL = 'debug'
