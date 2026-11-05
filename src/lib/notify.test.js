@@ -55,7 +55,7 @@ describe('notify client', () => {
   })
 
   it('posts an SMS to Notify with a bearer JWT', async () => {
-    await sendSms('template-sms', '07507123456', {
+    await sendSms('template-sms', '07700900123', {
       code: '123456',
       expiry_minutes: 15
     })
@@ -70,7 +70,7 @@ describe('notify client', () => {
     )
     expect(options.payload).toEqual({
       template_id: 'template-sms',
-      phone_number: '07507123456',
+      phone_number: '07700900123',
       personalisation: { code: '123456', expiry_minutes: 15 }
     })
     const auth = options.headers.Authorization
@@ -96,7 +96,7 @@ describe('notify client', () => {
   })
 
   it('counts each SMS that Notify accepts', async () => {
-    await sendSms('template-sms', '07507123456', {})
+    await sendSms('template-sms', '07700900123', {})
 
     expect(mockCounter).toHaveBeenCalledWith('notifySent', 1, {
       channel: 'sms'
@@ -106,7 +106,7 @@ describe('notify client', () => {
   it('does not count a message that Notify refuses', async () => {
     jest.mocked(postJson).mockRejectedValueOnce(new Error('Notify refused'))
 
-    await expect(sendSms('template-sms', '07507123456', {})).rejects.toThrow(
+    await expect(sendSms('template-sms', '07700900123', {})).rejects.toThrow(
       'Notify refused'
     )
 
