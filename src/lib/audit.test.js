@@ -12,6 +12,7 @@ import {
 jest.mock('@defra/cdp-auditing', () => ({
   audit: jest.fn()
 }))
+jest.mock('~/src/messaging/publish-base.js')
 
 describe('audit events', () => {
   it('records an OtpIssued event with the interaction id and email', () => {
@@ -25,8 +26,8 @@ describe('audit events', () => {
     })
   })
 
-  it('records an OtpLockedOut event with the unlock time as an ISO string', () => {
-    auditOtpLockout(
+  it('records an OtpLockedOut event with the unlock time as an ISO string', async () => {
+    await auditOtpLockout(
       'uid-1',
       'citizen@example.com',
       new Date('2026-09-11T12:00:00.000Z')
@@ -41,8 +42,8 @@ describe('audit events', () => {
     })
   })
 
-  it('records a SignIn event with the account id, email and interaction', () => {
-    auditSignIn('acc-1', 'citizen@example.com', 'uid-1')
+  it('records a SignIn event with the account id, email and interaction', async () => {
+    await auditSignIn('acc-1', 'citizen@example.com', 'uid-1')
 
     expect(audit).toHaveBeenCalledTimes(1)
     expect(audit).toHaveBeenCalledWith({
@@ -53,8 +54,8 @@ describe('audit events', () => {
     })
   })
 
-  it('records a SignOut event with the account id and email', () => {
-    auditSignOut('acc-1', 'citizen@example.com')
+  it('records a SignOut event with the account id and email', async () => {
+    await auditSignOut('acc-1', 'citizen@example.com')
 
     expect(audit).toHaveBeenCalledTimes(1)
     expect(audit).toHaveBeenCalledWith({
@@ -64,8 +65,8 @@ describe('audit events', () => {
     })
   })
 
-  it('records a Registration event with the account id, email and phone', () => {
-    auditRegistration('acc-1', 'citizen@example.com', '+447911123456')
+  it('records a Registration event with the account id, email and phone', async () => {
+    await auditRegistration('acc-1', 'citizen@example.com', '+447911123456')
 
     expect(audit).toHaveBeenCalledTimes(1)
     expect(audit).toHaveBeenCalledWith({

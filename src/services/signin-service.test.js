@@ -51,6 +51,7 @@ jest.mock('~/src/lib/audit.js', () => ({
   auditSignIn: jest.fn(),
   auditRegistration: jest.fn()
 }))
+jest.mock('~/src/messaging/publish-base.js')
 
 /** Codes an address may request in a window before it is locked out */
 const MAX_REQUESTS = 5

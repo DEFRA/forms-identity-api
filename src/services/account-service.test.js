@@ -25,6 +25,7 @@ jest.mock('~/src/repositories/accounts-repository.js', () => ({
 jest.mock('~/src/repositories/otps-repository.js')
 jest.mock('~/src/repositories/otp-lockouts-repository.js')
 jest.mock('@defra/cdp-auditing')
+jest.mock('~/src/messaging/publish-base.js')
 
 describe('account service', () => {
   const uid = 'uid-1'
@@ -140,7 +141,8 @@ describe('account service', () => {
       // @ts-expect-error - partial mock of test data
       jest.mocked(findById).mockResolvedValueOnce({
         status: 'active',
-        email: 'current-email@test.com'
+        email: 'current-email@test.com',
+        _id: 'acc-id'
       })
       jest
         .mocked(update)
@@ -180,7 +182,7 @@ describe('account service', () => {
       expect(audit).toHaveBeenCalledTimes(1)
       expect(audit).toHaveBeenCalledWith({
         event: 'EmailChanged',
-        accountId: undefined,
+        accountId: 'acc-id',
         email: 'new-email@test.com',
         newEmail: 'new-email@test.com',
         oldEmail: 'current-email@test.com'
@@ -259,7 +261,8 @@ describe('account service', () => {
       jest.mocked(findById).mockResolvedValueOnce({
         status: 'active',
         email: 'current-email@test.com',
-        phone: '+447500111111'
+        phone: '+447500111111',
+        _id: 'acc-id'
       })
       jest
         .mocked(update)
@@ -285,7 +288,7 @@ describe('account service', () => {
       expect(audit).toHaveBeenCalledTimes(1)
       expect(audit).toHaveBeenCalledWith({
         event: 'PhoneChanged',
-        accountId: undefined,
+        accountId: 'acc-id',
         email: 'current-email@test.com',
         newPhone: '+447500123456',
         oldPhone: '+447500111111'
@@ -297,7 +300,8 @@ describe('account service', () => {
       jest.mocked(findById).mockResolvedValueOnce({
         status: 'active',
         email: 'perf-1@example.forms.defra.gov.uk',
-        phone: '+447700900001'
+        phone: '+447700900001',
+        _id: 'acc-id'
       })
       jest.mocked(update).mockResolvedValueOnce(true)
       jest

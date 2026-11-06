@@ -10,6 +10,10 @@ import {
   auditSignIn
 } from '~/src/lib/audit.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
+import {
+  publishIncorrectCodeEnteredEvent,
+  publishIncorrectCodeLockoutEvent
+} from '~/src/messaging/publish.js'
 import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
@@ -225,7 +229,7 @@ async function claimOtpRequest(uid, target) {
   )
 
   if (locked) {
-    auditOtpLockout(uid, target, lockedUntil)
+    await auditOtpLockout(uid, target, lockedUntil)
   }
 
   return lockedUntil
@@ -346,6 +350,12 @@ export async function verifyOtp(uid, code, purpose, id) {
   if (!ok) {
     const consumed = await spendAttempt(claim)
 
+    if (consumed) {
+      await publishIncorrectCodeLockoutEvent(uid, id)
+    } else {
+      await publishIncorrectCodeEnteredEvent(uid, id)
+    }
+
     return consumed ? consumedOrExpiredResult : failResult
   }
 
@@ -393,7 +403,7 @@ async function handleWhenAccountExists(
     }
 
     setUserId(account._id)
-    auditSignIn(account._id, account.email, uid)
+    await auditSignIn(account._id, account.email, uid)
     return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
 
