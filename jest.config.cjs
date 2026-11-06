@@ -42,7 +42,11 @@ module.exports = {
       '@defra/cdp-auditing', // Supports ESM only
       '@defra/cdp-metrics', // Supports ESM only
       '@defra/forms-common', // Supports ESM only
-      '@defra/hapi-tracing' // Supports ESM only
+      '@defra/forms-model/.*',
+      '@defra/hapi-tracing', // Supports ESM only
+      '@joi/date', // Supports ESM only
+      'nanoid', // Supports ESM only
+      'slug' // Supports ESM only,
     ].join('|')}/)`
   ]
 }

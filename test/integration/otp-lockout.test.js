@@ -7,6 +7,7 @@ import {
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
+jest.mock('~/src/messaging/publish-base.js')
 
 const { inject, requestCode, requestCodeResponse, verify } = setupSigninFlow()
 

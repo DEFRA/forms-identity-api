@@ -54,8 +54,8 @@ export async function completeSignup(uid, phone) {
   }
 
   setUserId(account._id)
-  auditRegistration(account._id, account.email, account.phone)
-  auditSignIn(account._id, account.email, uid)
+  await auditSignIn(account._id, account.email, uid)
+  await auditRegistration(account._id, account.email, account.phone)
 
   return { status: STATUS.SIGNED_IN, accountId: account._id }
 }
