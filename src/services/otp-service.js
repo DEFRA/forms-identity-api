@@ -126,7 +126,7 @@ export async function requestOtp(
     throw Boom.badRequest()
   }
 
-  const lockedUntil = await claimOtpRequest(uid, target)
+  const lockedUntil = await claimOtpRequest(uid, purpose, target)
 
   if (lockedUntil) {
     return {
@@ -175,10 +175,11 @@ export async function requestOtp(
  * The counter is keyed on the address alone, not on the interaction, so
  * starting a fresh interaction for every request does not buy a fresh count.
  * @param {string} uid
+ * @param {PurposeType} purpose - the purpose for which the OTP is requested
  * @param {string} target - lowercased email
  * @returns {Promise<Date | null>} when the lockout lifts, or null if not locked out
  */
-async function claimOtpRequest(uid, target) {
+async function claimOtpRequest(uid, purpose, target) {
   const now = new Date()
   const key = { target }
   const existing = await otpLockoutsRepository.findOne(key)
@@ -229,7 +230,7 @@ async function claimOtpRequest(uid, target) {
   )
 
   if (locked) {
-    await auditOtpLockout(uid, target, lockedUntil)
+    await auditOtpLockout(uid, purpose, target, lockedUntil)
   }
 
   return lockedUntil
@@ -351,9 +352,9 @@ export async function verifyOtp(uid, code, purpose, id) {
     const { consumed, target } = await spendAttempt(claim)
 
     if (consumed) {
-      await publishIncorrectCodeLockoutEvent(uid, id, target)
+      await publishIncorrectCodeLockoutEvent(uid, purpose, id, target)
     } else {
-      await publishIncorrectCodeEnteredEvent(uid, id, target)
+      await publishIncorrectCodeEnteredEvent(uid, purpose, id, target)
     }
 
     return consumed ? consumedOrExpiredResult : failResult

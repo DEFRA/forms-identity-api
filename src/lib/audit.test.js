@@ -1,6 +1,7 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
 
+import { PURPOSE } from '~/src/constants.js'
 import {
   auditOtpIssued,
   auditOtpLockout,
@@ -29,6 +30,7 @@ describe('audit events', () => {
   it('records an OtpLockedOut event with the unlock time as an ISO string', async () => {
     await auditOtpLockout(
       'uid-1',
+      PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL,
       'citizen@example.com',
       new Date('2026-09-11T12:00:00.000Z')
     )

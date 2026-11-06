@@ -5,6 +5,7 @@ import {
   AuditEventMessageType
 } from '@defra/forms-model'
 
+import { PURPOSE } from '~/src/constants.js'
 import { publishEvent } from '~/src/messaging/publish-base.js'
 import {
   publishAccountDeletionEvent,
@@ -67,15 +68,25 @@ describe('publish identity events', () => {
     {
       name: 'too many OTPs requested',
       type: AuditEventMessageType.IDENTITY_TOO_MANY_OTPS_REQUESTED,
-      run: () => publishTooManyOtpsRequestedEvent(email, uid),
-      data: { target: email, uid },
+      run: () =>
+        publishTooManyOtpsRequestedEvent(
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          email,
+          uid
+        ),
+      data: { email, uid },
       entityId: expect.any(String),
       createdBy: { id: expect.any(String), displayName: email }
     },
     {
       name: 'incorrect code entered',
       type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
-      run: () => publishIncorrectCodeEnteredEvent(uid, accountId),
+      run: () =>
+        publishIncorrectCodeEnteredEvent(
+          uid,
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          accountId
+        ),
       data: { uid, accountId },
       entityId: accountId,
       createdBy: { id: accountId, displayName: uid }
@@ -83,7 +94,8 @@ describe('publish identity events', () => {
     {
       name: 'incorrect code entered without an account',
       type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
-      run: () => publishIncorrectCodeEnteredEvent(uid),
+      run: () =>
+        publishIncorrectCodeEnteredEvent(uid, PURPOSE.SIGNIN_VERIFY_EMAIL),
       data: { uid },
       entityId: expect.any(String),
       createdBy: { id: expect.any(String), displayName: uid }
@@ -91,7 +103,12 @@ describe('publish identity events', () => {
     {
       name: 'incorrect code lockout',
       type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_LOCKOUT,
-      run: () => publishIncorrectCodeLockoutEvent(uid, accountId),
+      run: () =>
+        publishIncorrectCodeLockoutEvent(
+          uid,
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          accountId
+        ),
       data: { uid, accountId },
       entityId: accountId,
       createdBy: { id: accountId, displayName: uid }
@@ -99,7 +116,11 @@ describe('publish identity events', () => {
     {
       name: 'incorrect code lockout without an account',
       type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_LOCKOUT,
-      run: () => publishIncorrectCodeLockoutEvent(uid),
+      run: () =>
+        publishIncorrectCodeLockoutEvent(
+          uid,
+          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
+        ),
       data: { uid },
       entityId: expect.any(String),
       createdBy: { id: expect.any(String), displayName: uid }

@@ -63,11 +63,12 @@ export async function publishRegistrationEvent(accountId, email, phone) {
 
 /**
  * Publish too many OTPs requested event
+ * @param {PurposeType} purpose
  * @param {string} target
  * @param {string} uid
  */
-export async function publishTooManyOtpsRequestedEvent(target, uid) {
-  const auditMessage = tooManyOtpsRequestedEventMapper(target, uid)
+export async function publishTooManyOtpsRequestedEvent(purpose, target, uid) {
+  const auditMessage = tooManyOtpsRequestedEventMapper(purpose, target, uid)
 
   return validateAndPublishEvent(auditMessage)
 }
@@ -75,11 +76,22 @@ export async function publishTooManyOtpsRequestedEvent(target, uid) {
 /**
  * Publish incorrect code entered event
  * @param {string} uid
+ * @param {PurposeType} purpose
  * @param {string} [accountId]
  * @param {string} [target]
  */
-export async function publishIncorrectCodeEnteredEvent(uid, accountId, target) {
-  const auditMessage = incorrectCodeEnteredEventMapper(uid, accountId, target)
+export async function publishIncorrectCodeEnteredEvent(
+  uid,
+  purpose,
+  accountId,
+  target
+) {
+  const auditMessage = incorrectCodeEnteredEventMapper(
+    uid,
+    purpose,
+    accountId,
+    target
+  )
 
   return validateAndPublishEvent(auditMessage)
 }
@@ -87,11 +99,22 @@ export async function publishIncorrectCodeEnteredEvent(uid, accountId, target) {
 /**
  * Publish incorrect code lockout event
  * @param {string} uid
+ * @param {PurposeType} purpose
  * @param {string} [accountId]
  * @param {string} [target]
  */
-export async function publishIncorrectCodeLockoutEvent(uid, accountId, target) {
-  const auditMessage = incorrectCodeLockoutEventMapper(uid, accountId, target)
+export async function publishIncorrectCodeLockoutEvent(
+  uid,
+  purpose,
+  accountId,
+  target
+) {
+  const auditMessage = incorrectCodeLockoutEventMapper(
+    uid,
+    purpose,
+    accountId,
+    target
+  )
 
   return validateAndPublishEvent(auditMessage)
 }
@@ -152,4 +175,5 @@ export async function publishPhoneNumberUpdatedEvent(
 
 /**
  * @import { AuditMessage } from '@defra/forms-model'
+ * @import { PurposeType } from '~/src/constants.js'
  */

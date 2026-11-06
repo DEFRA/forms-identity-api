@@ -104,15 +104,16 @@ export async function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
  * while it holds leave no OtpIssued record, so the trail reads as the
  * lockout followed by silence.
  * @param {string} uid - the interaction the limit was reached on
+ * @param {PurposeType} purpose - the purpose for which the OTP was requested
  * @param {string} target - the address or phone that is locked out
  * @param {Date} lockedUntil - when the address may request a code again
  */
-export async function auditOtpLockout(uid, target, lockedUntil) {
+export async function auditOtpLockout(uid, purpose, target, lockedUntil) {
   auditEvent(AUDIT_EVENT.OTP_LOCKED_OUT, target, {
     uid,
     lockedUntil: lockedUntil.toISOString()
   })
-  await publishTooManyOtpsRequestedEvent(target, uid)
+  await publishTooManyOtpsRequestedEvent(purpose, target, uid)
 }
 
 /**
@@ -157,3 +158,7 @@ export async function auditAccountDeleted(accountId, email) {
   auditAccountEvent(AUDIT_EVENT.ACCOUNT_DELETED, accountId, email)
   await publishAccountDeletionEvent(accountId, email)
 }
+
+/**
+ * @import { PurposeType } from '~/src/constants.js'
+ */

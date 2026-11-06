@@ -418,6 +418,7 @@ describe('signin service', () => {
       expect(auditOtpLockout).toHaveBeenCalledTimes(1)
       expect(auditOtpLockout).toHaveBeenCalledWith(
         'uid-5',
+        'SIGNIN_VERIFY_EMAIL',
         'a@b.com',
         new Date(lockedUntil)
       )

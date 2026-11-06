@@ -5,6 +5,26 @@ import {
   AuditEventMessageType
 } from '@defra/forms-model'
 
+import { TRANSPORT } from '~/src/constants.js'
+import { getTransportType } from '~/src/routes/otp-helper.js'
+
+/**
+ *
+ * @param {PurposeType} purpose
+ * @param { string | undefined } target -either email or phone, depending on purpose
+ * @returns {{ email: string } | { phone: string } | {}}
+ */
+function determineTarget(purpose, target) {
+  if (!target) return {}
+  if (getTransportType(purpose) === TRANSPORT.EMAIL) {
+    return { email: target }
+  }
+  if (getTransportType(purpose) === TRANSPORT.SMS) {
+    return { phone: target }
+  }
+  return {}
+}
+
 /**
  * @param {string} accountId
  * @param {string} email
@@ -88,11 +108,13 @@ export function registrationEventMapper(accountId, email, phone) {
 }
 
 /**
+ * @param {PurposeType} purpose
  * @param {string} target
  * @param {string} uid
  * @returns {IdentityTooManyOtpsRequestedMessage}
  */
-export function tooManyOtpsRequestedEventMapper(target, uid) {
+export function tooManyOtpsRequestedEventMapper(purpose, target, uid) {
+  const targetObj = determineTarget(purpose, target)
   /** @type {IdentityTooManyOtpsRequestedMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
@@ -106,7 +128,7 @@ export function tooManyOtpsRequestedEventMapper(target, uid) {
       displayName: target
     },
     data: {
-      target,
+      ...targetObj,
       uid
     },
     messageCreatedAt: new Date()
@@ -115,11 +137,18 @@ export function tooManyOtpsRequestedEventMapper(target, uid) {
 
 /**
  * @param {string} uid
+ * @param {PurposeType} purpose
  * @param {string} [accountId]
  * @param {string} [target]
  * @returns {IdentityIncorrectCodeEnteredMessage}
  */
-export function incorrectCodeEnteredEventMapper(uid, accountId, target) {
+export function incorrectCodeEnteredEventMapper(
+  uid,
+  purpose,
+  accountId,
+  target
+) {
+  const targetObj = determineTarget(purpose, target)
   /** @type {IdentityIncorrectCodeEnteredMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
@@ -134,7 +163,7 @@ export function incorrectCodeEnteredEventMapper(uid, accountId, target) {
     },
     data: {
       accountId,
-      target,
+      ...targetObj,
       uid
     },
     messageCreatedAt: new Date()
@@ -143,11 +172,18 @@ export function incorrectCodeEnteredEventMapper(uid, accountId, target) {
 
 /**
  * @param {string} uid
+ * @param {PurposeType} purpose
  * @param {string} [accountId]
  * @param {string} [target]
  * @returns {IdentityIncorrectCodeLockoutMessage}
  */
-export function incorrectCodeLockoutEventMapper(uid, accountId, target) {
+export function incorrectCodeLockoutEventMapper(
+  uid,
+  purpose,
+  accountId,
+  target
+) {
+  const targetObj = determineTarget(purpose, target)
   /** @type {IdentityIncorrectCodeLockoutMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
@@ -163,7 +199,7 @@ export function incorrectCodeLockoutEventMapper(uid, accountId, target) {
     data: {
       uid,
       accountId,
-      target
+      ...targetObj
     },
     messageCreatedAt: new Date()
   }
@@ -263,5 +299,6 @@ export function phoneNumberUpdatedEventMapper(
 }
 
 /**
- * @import { IdentitySignInSuccessfulMessage, IdentitySignInUnsuccessfulMessage, IdentitySignOutMessage, IdentityRegistrationMessage, IdentityTooManyOtpsRequestedMessage, IdentityIncorrectCodeEnteredMessage, IdentityIncorrectCodeLockoutMessage, IdentityAccountDeletionMessage, IdentityEmailAddressUpdatedMessage, IdentityPhoneNumberUpdatedMessage } from '@defra/forms-model'
+ * @import { IdentitySignInSuccessfulMessage, IdentitySignOutMessage, IdentityRegistrationMessage, IdentityTooManyOtpsRequestedMessage, IdentityIncorrectCodeEnteredMessage, IdentityIncorrectCodeLockoutMessage, IdentityAccountDeletionMessage, IdentityEmailAddressUpdatedMessage, IdentityPhoneNumberUpdatedMessage } from '@defra/forms-model'
+ * @import { PurposeType } from '~/src/constants.js'
  */
