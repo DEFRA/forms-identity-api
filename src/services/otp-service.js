@@ -348,12 +348,12 @@ export async function verifyOtp(uid, code, purpose, id) {
   const failResult = { status: STATUS.INVALID }
 
   if (!ok) {
-    const consumed = await spendAttempt(claim)
+    const { consumed, target } = await spendAttempt(claim)
 
     if (consumed) {
-      await publishIncorrectCodeLockoutEvent(uid, id)
+      await publishIncorrectCodeLockoutEvent(uid, id, target)
     } else {
-      await publishIncorrectCodeEnteredEvent(uid, id)
+      await publishIncorrectCodeEnteredEvent(uid, id, target)
     }
 
     return consumed ? consumedOrExpiredResult : failResult
@@ -459,7 +459,7 @@ async function spendAttempt(claim) {
     consumed = await otpsRepository.update(claim, { consumed: true })
   }
 
-  return consumed
+  return { consumed, target: updated?.target }
 }
 
 /**

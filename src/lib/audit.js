@@ -95,7 +95,7 @@ export async function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
     oldPhone,
     newPhone
   })
-  await publishPhoneNumberUpdatedEvent(accountId, oldPhone, newPhone)
+  await publishPhoneNumberUpdatedEvent(accountId, email, oldPhone, newPhone)
 }
 
 /**

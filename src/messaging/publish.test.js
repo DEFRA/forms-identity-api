@@ -15,8 +15,7 @@ import {
   publishRegistrationEvent,
   publishSignOutEvent,
   publishSuccessfulSignInEvent,
-  publishTooManyOtpsRequestedEvent,
-  publishUnsuccessfulSignInEvent
+  publishTooManyOtpsRequestedEvent
 } from '~/src/messaging/publish.js'
 
 jest.mock('~/src/messaging/publish-base.js')
@@ -48,14 +47,6 @@ describe('publish identity events', () => {
       data: { accountId, email, uid },
       entityId: accountId,
       createdBy: { id: accountId, displayName: email }
-    },
-    {
-      name: 'unsuccessful sign-in',
-      type: AuditEventMessageType.IDENTITY_SIGN_IN_UNSUCCESSFUL,
-      run: () => publishUnsuccessfulSignInEvent(email, uid),
-      data: { email, uid },
-      entityId: expect.any(String),
-      createdBy: { id: expect.any(String), displayName: email }
     },
     {
       name: 'sign-out',
@@ -137,9 +128,15 @@ describe('publish identity events', () => {
       name: 'phone number update',
       type: AuditEventMessageType.IDENTITY_PHONE_NUMBER_UPDATED,
       run: () =>
-        publishPhoneNumberUpdatedEvent(accountId, '+440000000000', phone),
+        publishPhoneNumberUpdatedEvent(
+          accountId,
+          'test@example.gov.uk',
+          '+440000000000',
+          phone
+        ),
       data: {
         accountId,
+        email: 'test@example.gov.uk',
         changed: { old: '+440000000000', new: phone }
       },
       entityId: accountId,

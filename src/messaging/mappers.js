@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import {
   AuditEventMessageCategory,
   AuditEventMessageSchemaVersion,
@@ -28,33 +26,6 @@ export function successfulSignInEventMapper(accountId, email, uid) {
     },
     data: {
       accountId,
-      email,
-      uid
-    },
-    messageCreatedAt: new Date()
-  }
-}
-
-/**
- * @param {string} email
- * @param {string} uid
- * @returns {IdentitySignInUnsuccessfulMessage}
- */
-export function unsuccessfulSignInEventMapper(email, uid) {
-  const newId = randomUUID()
-  /** @type {IdentitySignInUnsuccessfulMessage} */
-  return {
-    schemaVersion: AuditEventMessageSchemaVersion.V1,
-    category: AuditEventMessageCategory.AUTHENTICATION,
-    source: AuditEventMessageSource.FORMS_IDENTITY,
-    type: AuditEventMessageType.IDENTITY_SIGN_IN_UNSUCCESSFUL,
-    entityId: newId,
-    createdAt: new Date(),
-    createdBy: {
-      id: newId,
-      displayName: email
-    },
-    data: {
       email,
       uid
     },
@@ -122,17 +93,16 @@ export function registrationEventMapper(accountId, email, phone) {
  * @returns {IdentityTooManyOtpsRequestedMessage}
  */
 export function tooManyOtpsRequestedEventMapper(target, uid) {
-  const newId = randomUUID()
   /** @type {IdentityTooManyOtpsRequestedMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
     category: AuditEventMessageCategory.AUTHENTICATION,
     source: AuditEventMessageSource.FORMS_IDENTITY,
     type: AuditEventMessageType.IDENTITY_TOO_MANY_OTPS_REQUESTED,
-    entityId: newId,
+    entityId: uid,
     createdAt: new Date(),
     createdBy: {
-      id: newId,
+      id: uid,
       displayName: target
     },
     data: {
@@ -146,25 +116,26 @@ export function tooManyOtpsRequestedEventMapper(target, uid) {
 /**
  * @param {string} uid
  * @param {string} [accountId]
+ * @param {string} [target]
  * @returns {IdentityIncorrectCodeEnteredMessage}
  */
-export function incorrectCodeEnteredEventMapper(uid, accountId) {
-  const newId = randomUUID()
+export function incorrectCodeEnteredEventMapper(uid, accountId, target) {
   /** @type {IdentityIncorrectCodeEnteredMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
     category: AuditEventMessageCategory.AUTHENTICATION,
     source: AuditEventMessageSource.FORMS_IDENTITY,
     type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
-    entityId: accountId ?? newId,
+    entityId: accountId ?? uid,
     createdAt: new Date(),
     createdBy: {
-      id: accountId ?? newId,
-      displayName: uid
+      id: accountId ?? uid,
+      displayName: target ?? uid
     },
     data: {
-      uid,
-      accountId
+      accountId,
+      target,
+      uid
     },
     messageCreatedAt: new Date()
   }
@@ -173,25 +144,26 @@ export function incorrectCodeEnteredEventMapper(uid, accountId) {
 /**
  * @param {string} uid
  * @param {string} [accountId]
+ * @param {string} [target]
  * @returns {IdentityIncorrectCodeLockoutMessage}
  */
-export function incorrectCodeLockoutEventMapper(uid, accountId) {
-  const newId = randomUUID()
+export function incorrectCodeLockoutEventMapper(uid, accountId, target) {
   /** @type {IdentityIncorrectCodeLockoutMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
     category: AuditEventMessageCategory.AUTHENTICATION,
     source: AuditEventMessageSource.FORMS_IDENTITY,
     type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_LOCKOUT,
-    entityId: accountId ?? newId,
+    entityId: accountId ?? uid,
     createdAt: new Date(),
     createdBy: {
-      id: accountId ?? newId,
-      displayName: uid
+      id: accountId ?? uid,
+      displayName: target ?? uid
     },
     data: {
       uid,
-      accountId
+      accountId,
+      target
     },
     messageCreatedAt: new Date()
   }
@@ -255,11 +227,17 @@ export function emailAddressUpdatedEventMapper(accountId, oldEmail, newEmail) {
 
 /**
  * @param {string} accountId
+ * @param {string} email
  * @param {string} oldPhone
  * @param {string} newPhone
  * @returns {IdentityPhoneNumberUpdatedMessage}
  */
-export function phoneNumberUpdatedEventMapper(accountId, oldPhone, newPhone) {
+export function phoneNumberUpdatedEventMapper(
+  accountId,
+  email,
+  oldPhone,
+  newPhone
+) {
   /** @type {IdentityPhoneNumberUpdatedMessage} */
   return {
     schemaVersion: AuditEventMessageSchemaVersion.V1,
@@ -274,6 +252,7 @@ export function phoneNumberUpdatedEventMapper(accountId, oldPhone, newPhone) {
     },
     data: {
       accountId,
+      email,
       changed: {
         old: oldPhone,
         new: newPhone

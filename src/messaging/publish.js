@@ -10,8 +10,7 @@ import {
   registrationEventMapper,
   signOutEventMapper,
   successfulSignInEventMapper,
-  tooManyOtpsRequestedEventMapper,
-  unsuccessfulSignInEventMapper
+  tooManyOtpsRequestedEventMapper
 } from '~/src/messaging/mappers.js'
 import { publishEvent } from '~/src/messaging/publish-base.js'
 
@@ -35,18 +34,6 @@ async function validateAndPublishEvent(auditMessage) {
  */
 export async function publishSuccessfulSignInEvent(accountId, email, uid) {
   const auditMessage = successfulSignInEventMapper(accountId, email, uid)
-
-  return validateAndPublishEvent(auditMessage)
-}
-
-/**
- * Publish unsuccessful sign-in event
- * @param {string} email
- * @param {string} uid
- */
-export async function publishUnsuccessfulSignInEvent(email, uid) {
-  // TODO - where does this get called from?
-  const auditMessage = unsuccessfulSignInEventMapper(email, uid)
 
   return validateAndPublishEvent(auditMessage)
 }
@@ -89,9 +76,10 @@ export async function publishTooManyOtpsRequestedEvent(target, uid) {
  * Publish incorrect code entered event
  * @param {string} uid
  * @param {string} [accountId]
+ * @param {string} [target]
  */
-export async function publishIncorrectCodeEnteredEvent(uid, accountId) {
-  const auditMessage = incorrectCodeEnteredEventMapper(uid, accountId)
+export async function publishIncorrectCodeEnteredEvent(uid, accountId, target) {
+  const auditMessage = incorrectCodeEnteredEventMapper(uid, accountId, target)
 
   return validateAndPublishEvent(auditMessage)
 }
@@ -100,9 +88,10 @@ export async function publishIncorrectCodeEnteredEvent(uid, accountId) {
  * Publish incorrect code lockout event
  * @param {string} uid
  * @param {string} [accountId]
+ * @param {string} [target]
  */
-export async function publishIncorrectCodeLockoutEvent(uid, accountId) {
-  const auditMessage = incorrectCodeLockoutEventMapper(uid, accountId)
+export async function publishIncorrectCodeLockoutEvent(uid, accountId, target) {
+  const auditMessage = incorrectCodeLockoutEventMapper(uid, accountId, target)
 
   return validateAndPublishEvent(auditMessage)
 }
@@ -141,16 +130,19 @@ export async function publishEmailAddressUpdatedEvent(
 /**
  * Publish phone number updated event
  * @param {string} accountId
+ * @param {string} email
  * @param {string} oldPhone
  * @param {string} newPhone
  */
 export async function publishPhoneNumberUpdatedEvent(
   accountId,
+  email,
   oldPhone,
   newPhone
 ) {
   const auditMessage = phoneNumberUpdatedEventMapper(
     accountId,
+    email,
     oldPhone,
     newPhone
   )
