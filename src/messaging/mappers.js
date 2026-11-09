@@ -15,12 +15,13 @@ import { getTransportType } from '~/src/routes/otp-helper.js'
  * @returns {{ email: string, purpose: PurposeType } | { phone: string, purpose: PurposeType } | undefined }
  */
 function determineTarget(purpose, target) {
-  if (!target) return undefined
-  if (getTransportType(purpose) === TRANSPORT.EMAIL) {
-    return { email: target, purpose }
-  }
-  if (getTransportType(purpose) === TRANSPORT.SMS) {
-    return { phone: target, purpose }
+  if (target) {
+    if (getTransportType(purpose) === TRANSPORT.EMAIL) {
+      return { email: target, purpose }
+    }
+    if (getTransportType(purpose) === TRANSPORT.SMS) {
+      return { phone: target, purpose }
+    }
   }
   return undefined
 }
