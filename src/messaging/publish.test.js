@@ -74,7 +74,7 @@ describe('publish identity events', () => {
           email,
           uid
         ),
-      data: { email, uid },
+      data: { email, uid, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
       entityId: expect.any(String),
       createdBy: { id: expect.any(String), displayName: email }
     },
@@ -85,20 +85,26 @@ describe('publish identity events', () => {
         publishIncorrectCodeEnteredEvent(
           uid,
           PURPOSE.SIGNIN_VERIFY_EMAIL,
-          accountId
+          accountId,
+          email
         ),
-      data: { uid, accountId },
+      data: { uid, accountId, email, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
       entityId: accountId,
-      createdBy: { id: accountId, displayName: uid }
+      createdBy: { id: accountId, displayName: email }
     },
     {
       name: 'incorrect code entered without an account',
       type: AuditEventMessageType.IDENTITY_INCORRECT_CODE_ENTERED,
       run: () =>
-        publishIncorrectCodeEnteredEvent(uid, PURPOSE.SIGNIN_VERIFY_EMAIL),
-      data: { uid },
+        publishIncorrectCodeEnteredEvent(
+          uid,
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          undefined,
+          email
+        ),
+      data: { uid, email, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
       entityId: expect.any(String),
-      createdBy: { id: expect.any(String), displayName: uid }
+      createdBy: { id: expect.any(String), displayName: email }
     },
     {
       name: 'incorrect code lockout',
@@ -107,11 +113,12 @@ describe('publish identity events', () => {
         publishIncorrectCodeLockoutEvent(
           uid,
           PURPOSE.SIGNIN_VERIFY_EMAIL,
-          accountId
+          accountId,
+          email
         ),
-      data: { uid, accountId },
+      data: { uid, accountId, email, purpose: PURPOSE.SIGNIN_VERIFY_EMAIL },
       entityId: accountId,
-      createdBy: { id: accountId, displayName: uid }
+      createdBy: { id: accountId, displayName: email }
     },
     {
       name: 'incorrect code lockout without an account',
@@ -119,11 +126,13 @@ describe('publish identity events', () => {
       run: () =>
         publishIncorrectCodeLockoutEvent(
           uid,
-          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
+          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
+          undefined,
+          phone
         ),
-      data: { uid },
+      data: { uid, phone, purpose: PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE },
       entityId: expect.any(String),
-      createdBy: { id: expect.any(String), displayName: uid }
+      createdBy: { id: expect.any(String), displayName: phone }
     },
     {
       name: 'account deletion',
