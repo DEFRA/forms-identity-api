@@ -35,9 +35,10 @@ export async function update(filter, fields) {
  * Removes the counter for an address, so its next request starts a fresh
  * count. Matching nothing is success: the address had no counter to clear.
  * @param {Filter<OtpLockoutDocument>} filter
+ * @param {ClientSession} [session]
  */
-export async function clear(filter) {
-  await coll().deleteOne(filter)
+export async function clear(filter, session) {
+  await coll().deleteOne(filter, session ? { session } : undefined)
 }
 
 /**
@@ -86,5 +87,5 @@ function coll() {
 }
 
 /**
- * @import { Collection, Filter, MatchKeysAndValues } from 'mongodb'
+ * @import { ClientSession, Collection, Filter, MatchKeysAndValues } from 'mongodb'
  */

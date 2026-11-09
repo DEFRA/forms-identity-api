@@ -2,12 +2,16 @@
 import { audit } from '@defra/cdp-auditing'
 import Boom from '@hapi/boom'
 
+import { logger } from '~/src/helpers/logging/logger.js'
+import { publishEvent } from '~/src/messaging/publish-base.js'
+import { client } from '~/src/mongo.js'
 import {
   findByEmail,
   findById,
   isDuplicateKeyError,
   update as updateAccount
 } from '~/src/repositories/accounts-repository.js'
+import { clear } from '~/src/repositories/otp-lockouts-repository.js'
 import { findOne, update } from '~/src/repositories/otps-repository.js'
 import {
   deleteAccount,
@@ -15,6 +19,7 @@ import {
   updateEmail,
   updatePhone
 } from '~/src/services/account-service.js'
+import { createTransactionSession } from '~/test/helpers/transaction-session.js'
 
 jest.mock('~/src/repositories/accounts-repository.js', () => ({
   findByEmail: jest.fn(),
@@ -24,6 +29,9 @@ jest.mock('~/src/repositories/accounts-repository.js', () => ({
 }))
 jest.mock('~/src/repositories/otps-repository.js')
 jest.mock('~/src/repositories/otp-lockouts-repository.js')
+jest.mock('~/src/mongo.js', () => ({
+  client: { startSession: jest.fn() }
+}))
 jest.mock('@defra/cdp-auditing')
 jest.mock('~/src/messaging/publish-base.js')
 
@@ -37,6 +45,16 @@ describe('account service', () => {
     accountId: id,
     target: email
   }
+
+  /** @type {ReturnType<typeof createTransactionSession>} */
+  let session
+
+  beforeEach(() => {
+    session = createTransactionSession()
+    jest
+      .mocked(client.startSession)
+      .mockReturnValue(/** @type {never} */ (session))
+  })
 
   it('should throw when account not found', async () => {
     jest.mocked(findById).mockResolvedValueOnce(null)
@@ -128,10 +146,14 @@ describe('account service', () => {
       const res = await updateEmail(uid, id)
       expect(res).toEqual({ status: 'already-in-use' })
       expect(updateAccount).toHaveBeenCalledTimes(1)
-      expect(updateAccount).toHaveBeenCalledWith('acc-id', {
-        email: 'new-email@test.com',
-        updatedAt: expect.any(Date)
-      })
+      expect(updateAccount).toHaveBeenCalledWith(
+        'acc-id',
+        {
+          email: 'new-email@test.com',
+          updatedAt: expect.any(Date)
+        },
+        session
+      )
       expect(update).not.toHaveBeenCalled()
       expect(findByEmail).toHaveBeenCalledWith(email)
       expect(audit).not.toHaveBeenCalled()
@@ -156,6 +178,17 @@ describe('account service', () => {
         .mockResolvedValueOnce(validOtp)
       const res = await updateEmail(uid, id)
       expect(res).toEqual({ status: 'valid' })
+      expect(session.withTransaction).toHaveBeenCalledTimes(1)
+      expect(session.endSession).toHaveBeenCalledTimes(1)
+      expect(findOne).toHaveBeenCalledTimes(2)
+      expect(findOne).toHaveBeenNthCalledWith(1, expect.anything(), session)
+      expect(findOne).toHaveBeenNthCalledWith(2, expect.anything(), session)
+      expect(findById).toHaveBeenCalledWith(id, session)
+      expect(updateAccount).toHaveBeenCalledWith(
+        id,
+        expect.objectContaining({ email: 'new-email@test.com' }),
+        session
+      )
       expect(update).toHaveBeenCalledTimes(2)
       expect(update).toHaveBeenNthCalledWith(
         1,
@@ -166,7 +199,8 @@ describe('account service', () => {
           uid: 'uid-1',
           verified: true
         },
-        { consumed: true }
+        { consumed: true },
+        session
       )
       expect(update).toHaveBeenNthCalledWith(
         2,
@@ -177,8 +211,11 @@ describe('account service', () => {
           uid: 'uid-1',
           verified: true
         },
-        { consumed: true }
+        { consumed: true },
+        session
       )
+      expect(clear).toHaveBeenCalledTimes(2)
+      expect(clear).toHaveBeenCalledWith({ target: email }, session)
       expect(audit).toHaveBeenCalledTimes(1)
       expect(audit).toHaveBeenCalledWith({
         event: 'EmailChanged',
@@ -187,6 +224,79 @@ describe('account service', () => {
         newEmail: 'new-email@test.com',
         oldEmail: 'current-email@test.com'
       })
+    })
+
+    it('should roll everything back, without auditing, when the second OTP was already spent', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com',
+        _id: 'acc-id'
+      })
+      jest
+        .mocked(update)
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false)
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+
+      const res = await updateEmail(uid, id)
+
+      expect(res).toEqual({ status: 'invalid' })
+      expect(clear).not.toHaveBeenCalled()
+      expect(audit).not.toHaveBeenCalled()
+      expect(session.endSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not audit, and should throw, when a write in the transaction fails', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com',
+        _id: 'acc-id'
+      })
+      jest.mocked(update).mockResolvedValue(true)
+      const error = new Error('clear failed')
+      jest.mocked(clear).mockRejectedValueOnce(error)
+      jest.mocked(isDuplicateKeyError).mockReturnValue(false)
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+
+      await expect(updateEmail(uid, id)).rejects.toBe(error)
+
+      expect(audit).not.toHaveBeenCalled()
+      expect(session.endSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('should still report success when publishing the audit event fails after the commit', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com',
+        _id: 'acc-id'
+      })
+      jest.mocked(update).mockResolvedValue(true)
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+      jest.mocked(publishEvent).mockRejectedValue(new Error('SNS is down'))
+      const logError = jest.spyOn(logger, 'error').mockImplementation()
+
+      const res = await updateEmail(uid, id)
+
+      expect(res).toEqual({ status: 'valid' })
+      expect(logError).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -283,8 +393,16 @@ describe('account service', () => {
           uid: 'uid-1',
           verified: true
         },
-        { consumed: true }
+        { consumed: true },
+        session
       )
+      expect(updateAccount).toHaveBeenCalledWith(
+        id,
+        expect.objectContaining({ phone: '+447500123456' }),
+        session
+      )
+      expect(clear).toHaveBeenCalledWith({ target: email }, session)
+      expect(session.withTransaction).toHaveBeenCalledTimes(1)
       expect(audit).toHaveBeenCalledTimes(1)
       expect(audit).toHaveBeenCalledWith({
         event: 'PhoneChanged',
@@ -312,8 +430,30 @@ describe('account service', () => {
       expect(res).toEqual({ status: 'valid' })
       expect(updateAccount).toHaveBeenCalledWith(
         id,
-        expect.objectContaining({ phone: '+447700900000' })
+        expect.objectContaining({ phone: '+447700900000' }),
+        session
       )
+    })
+
+    it('should roll back, without auditing, when the OTP was already spent', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com',
+        phone: '+447500111111',
+        _id: 'acc-id'
+      })
+      jest.mocked(update).mockResolvedValueOnce(false)
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+
+      const res = await updatePhone(uid, id, newPhone)
+
+      expect(res).toEqual({ status: 'invalid' })
+      expect(clear).not.toHaveBeenCalled()
+      expect(audit).not.toHaveBeenCalled()
     })
 
     it('should return invalid-phone for an Ofcom fictional number on a normal account', async () => {
@@ -363,13 +503,19 @@ describe('account service', () => {
       await expect(deleteAccount(uid, id)).rejects.toThrow(
         Boom.notFound(`Account ${id} not found`)
       )
-      expect(findOne).toHaveBeenCalledWith({
-        uid,
-        purpose: 'ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL',
-        verified: true,
-        consumed: false,
-        accountId: id
-      })
+      expect(findOne).toHaveBeenCalledWith(
+        {
+          uid,
+          purpose: 'ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL',
+          verified: true,
+          consumed: false,
+          accountId: id
+        },
+        session
+      )
+      expect(session.endSession).toHaveBeenCalledTimes(1)
+      expect(clear).not.toHaveBeenCalled()
+      expect(audit).not.toHaveBeenCalled()
     })
 
     it('should throw Boom.badRequest when account found but not updated', async () => {
@@ -396,10 +542,14 @@ describe('account service', () => {
 
       await expect(deleteAccount(uid, id)).resolves.toEqual({ status: 'valid' })
 
-      expect(updateAccount).toHaveBeenCalledWith(id, {
-        status: 'deleted',
-        updatedAt: expect.any(Date)
-      })
+      expect(updateAccount).toHaveBeenCalledWith(
+        id,
+        {
+          status: 'deleted',
+          updatedAt: expect.any(Date)
+        },
+        session
+      )
       expect(update).toHaveBeenCalledWith(
         {
           uid,
@@ -408,8 +558,10 @@ describe('account service', () => {
           consumed: false,
           accountId: id
         },
-        { consumed: true }
+        { consumed: true },
+        session
       )
+      expect(clear).toHaveBeenCalledWith({ target: email }, session)
       expect(audit).toHaveBeenCalledWith({
         event: 'AccountDeleted',
         accountId: id,

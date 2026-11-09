@@ -12,7 +12,7 @@ import {
 } from '~/src/mongo.js'
 import {
   MONGO_BOOT_TIMEOUT_MS,
-  startMongoMemoryServer
+  startMongoMemoryReplSet
 } from '~/test/helpers/mongo-memory.js'
 import {
   mintToken,
@@ -28,7 +28,7 @@ function lastSentCode() {
 
 /**
  * Registers suite lifecycle hooks that boot the real Hapi server (including
- * prepareDb and its indexes) against an in-memory mongod, and returns
+ * prepareDb and its indexes) against an in-memory replica set, and returns
  * helpers for driving the sign-in flow over HTTP.
  *
  * Callers must `jest.mock('~/src/lib/notify.js')` themselves — jest scopes
@@ -37,14 +37,14 @@ function lastSentCode() {
  * argon2 hash), so tests read it from the mock.
  */
 export function setupSigninFlow() {
-  /** @type {import('mongodb-memory-server').MongoMemoryServer} */
+  /** @type {import('mongodb-memory-server').MongoMemoryReplSet} */
   let mongod
   /** @type {import('@hapi/hapi').Server} */
   let server
 
   beforeAll(async () => {
     startServiceAuthStub()
-    mongod = await startMongoMemoryServer()
+    mongod = await startMongoMemoryReplSet()
     server = await createServer()
     await server.initialize()
   }, MONGO_BOOT_TIMEOUT_MS)

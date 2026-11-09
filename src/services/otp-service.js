@@ -264,9 +264,10 @@ function hasWindowElapsed(counter, now) {
  * address, so the count they ran up getting in should not follow them into
  * their next sign-in.
  * @param {string} target - lowercased email
+ * @param {ClientSession} [session]
  */
-export function clearRequestCount(target) {
-  return otpLockoutsRepository.clear({ target })
+export function clearRequestCount(target, session) {
+  return otpLockoutsRepository.clear({ target }, session)
 }
 
 /**
@@ -492,7 +493,7 @@ export async function findOtp(uid, purpose) {
 }
 
 /**
- * @import { Filter, WithId } from 'mongodb'
+ * @import { ClientSession, Filter, WithId } from 'mongodb'
  * @import { HashOptions } from 'argon2'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
  * @import { OtpLockoutDocument } from '~/src/repositories/otp-lockouts-repository.js'
