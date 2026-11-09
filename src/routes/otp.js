@@ -2,6 +2,7 @@ import Boom from '@hapi/boom'
 import Joi from 'joi'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { getTransportType } from '~/src/routes/otp-helper.js'
 import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
 const transportSchema = Joi.string()
@@ -10,17 +11,6 @@ const transportSchema = Joi.string()
 const purposeSchema = Joi.string()
   .valid(...Object.keys(PURPOSE))
   .default(PURPOSE.SIGNIN_VERIFY_EMAIL)
-
-/** @type {Set<PurposeType>} */
-const transportMustBeEmail = new Set([
-  PURPOSE.SIGNIN_VERIFY_EMAIL,
-  PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-  PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL,
-  PURPOSE.ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL
-])
-
-/** @type {Set<PurposeType>} */
-const transportMustBeSms = new Set([PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE])
 
 /**
  * Domain routes for OTP operations, consumed only by forms-identity-ui over the
@@ -56,10 +46,16 @@ export default /** @type {ServerRoute[]} */ ([
           request.payload
         )
       // Further guards (in addition to Joi schema)
-      if (transportMustBeEmail.has(purpose) && transport !== TRANSPORT.EMAIL) {
+      if (
+        getTransportType(purpose) === TRANSPORT.EMAIL &&
+        transport !== TRANSPORT.EMAIL
+      ) {
         throw Boom.badRequest()
       }
-      if (transportMustBeSms.has(purpose) && transport !== TRANSPORT.SMS) {
+      if (
+        getTransportType(purpose) === TRANSPORT.SMS &&
+        transport !== TRANSPORT.SMS
+      ) {
         throw Boom.badRequest()
       }
       return requestOtp(uid, target, transport, purpose, accountId)

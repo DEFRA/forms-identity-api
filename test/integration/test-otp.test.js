@@ -6,6 +6,7 @@ import { createAccount } from '~/src/services/signin-service.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
+jest.mock('~/src/messaging/publish-base.js')
 
 const SECRET = config.get('otp.testRead.secret')
 const TEST_ADDRESS = 'perf-1@example.forms.defra.gov.uk'

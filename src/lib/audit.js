@@ -1,6 +1,16 @@
 // @ts-expect-error - no types available for '@defra/cdp-auditing'
 import { audit } from '@defra/cdp-auditing'
 
+import {
+  publishAccountDeletionEvent,
+  publishEmailAddressUpdatedEvent,
+  publishPhoneNumberUpdatedEvent,
+  publishRegistrationEvent,
+  publishSignOutEvent,
+  publishSuccessfulSignInEvent,
+  publishTooManyOtpsRequestedEvent
+} from '~/src/messaging/publish.js'
+
 /**
  * Audit event names. Each name is the event as it appears in the audit
  * record, so downstream consumers can filter on it.
@@ -65,11 +75,12 @@ export function auditOtpIssued(uid, email, phone) {
  * @param {string} oldEmail - the old email address
  * @param {string} newEmail - the new email address
  */
-export function auditEmailChanged(accountId, oldEmail, newEmail) {
+export async function auditEmailChanged(accountId, oldEmail, newEmail) {
   auditAccountEvent(AUDIT_EVENT.EMAIL_CHANGED, accountId, newEmail, {
     oldEmail,
     newEmail
   })
+  await publishEmailAddressUpdatedEvent(accountId, oldEmail, newEmail)
 }
 
 /**
@@ -79,11 +90,12 @@ export function auditEmailChanged(accountId, oldEmail, newEmail) {
  * @param {string} oldPhone - the old phone number
  * @param {string} newPhone - the new phone number
  */
-export function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
+export async function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
   auditAccountEvent(AUDIT_EVENT.PHONE_CHANGED, accountId, email, {
     oldPhone,
     newPhone
   })
+  await publishPhoneNumberUpdatedEvent(accountId, email, oldPhone, newPhone)
 }
 
 /**
@@ -92,14 +104,16 @@ export function auditPhoneChanged(accountId, email, oldPhone, newPhone) {
  * while it holds leave no OtpIssued record, so the trail reads as the
  * lockout followed by silence.
  * @param {string} uid - the interaction the limit was reached on
- * @param {string} email - the address that is locked out
+ * @param {PurposeType} purpose - the purpose for which the OTP was requested
+ * @param {string} target - the address or phone that is locked out
  * @param {Date} lockedUntil - when the address may request a code again
  */
-export function auditOtpLockout(uid, email, lockedUntil) {
-  auditEvent(AUDIT_EVENT.OTP_LOCKED_OUT, email, {
+export async function auditOtpLockout(uid, purpose, target, lockedUntil) {
+  auditEvent(AUDIT_EVENT.OTP_LOCKED_OUT, target, {
     uid,
     lockedUntil: lockedUntil.toISOString()
   })
+  await publishTooManyOtpsRequestedEvent(purpose, target, uid)
 }
 
 /**
@@ -109,8 +123,9 @@ export function auditOtpLockout(uid, email, lockedUntil) {
  * @param {string} uid - the interaction signed in on, tying the sign-in back
  * to the OtpIssued record for the code that granted it
  */
-export function auditSignIn(accountId, email, uid) {
+export async function auditSignIn(accountId, email, uid) {
   auditAccountEvent(AUDIT_EVENT.SIGN_IN, accountId, email, { uid })
+  await publishSuccessfulSignInEvent(accountId, email, uid)
 }
 
 /**
@@ -118,8 +133,9 @@ export function auditSignIn(accountId, email, uid) {
  * @param {string} accountId - the account `_id`, which is also the OIDC `sub`
  * @param {string} email
  */
-export function auditSignOut(accountId, email) {
+export async function auditSignOut(accountId, email) {
   auditAccountEvent(AUDIT_EVENT.SIGN_OUT, accountId, email)
+  await publishSignOutEvent(accountId, email)
 }
 
 /**
@@ -128,8 +144,9 @@ export function auditSignOut(accountId, email) {
  * @param {string} email
  * @param {string} phone - E.164
  */
-export function auditRegistration(accountId, email, phone) {
+export async function auditRegistration(accountId, email, phone) {
   auditAccountEvent(AUDIT_EVENT.REGISTRATION, accountId, email, { phone })
+  await publishRegistrationEvent(accountId, email, phone)
 }
 
 /**
@@ -137,6 +154,11 @@ export function auditRegistration(accountId, email, phone) {
  * @param {string} accountId
  * @param {string} email
  */
-export function auditAccountDeleted(accountId, email) {
+export async function auditAccountDeleted(accountId, email) {
   auditAccountEvent(AUDIT_EVENT.ACCOUNT_DELETED, accountId, email)
+  await publishAccountDeletionEvent(accountId, email)
 }
+
+/**
+ * @import { PurposeType } from '~/src/constants.js'
+ */

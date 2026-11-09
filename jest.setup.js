@@ -31,3 +31,8 @@ process.env.OTP_LOCKOUT_MAX_REQUESTS = '5'
 process.env.OTP_LOCKOUT_WINDOW_SECONDS = '7200'
 process.env.OTP_LOCKOUT_DURATION_SECONDS = '7200'
 process.env.OTP_TEST_READ_SECRET = 'a-test-secret-of-32-characters-x'
+
+process.env.AWS_REGION = 'eu-west-2'
+process.env.SNS_ENDPOINT = 'http://localhost:4566'
+process.env.SNS_TOPIC_ARN =
+  'arn:aws:sns:eu-west-2:000000000000:forms_identity_events'

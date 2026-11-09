@@ -92,7 +92,7 @@ export async function updateEmail(uid, id) {
   await clearRequestCount(otpPhone.target)
   await clearRequestCount(newEmail)
 
-  auditEmailChanged(account._id, oldEmail, newEmail)
+  await auditEmailChanged(account._id, oldEmail, newEmail)
 
   return { status: STATUS.VALID }
 }
@@ -157,7 +157,7 @@ export async function updatePhone(uid, id, phone) {
   // Clear any previous OTP requests from the same email
   await clearRequestCount(otpEmail.target)
 
-  auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
+  await auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
 
   return { status: STATUS.VALID }
 }
@@ -213,8 +213,8 @@ export async function deleteAccount(uid, id) {
   // Clear any previous OTP requests from the same email
   await clearRequestCount(otpEmail.target)
 
-  auditAccountDeleted(id, otpEmail.target)
-  auditSignOut(id, otpEmail.target)
+  await auditAccountDeleted(id, otpEmail.target)
+  await auditSignOut(id, otpEmail.target)
 
   return { status: STATUS.VALID }
 }
@@ -231,7 +231,7 @@ export async function recordSignOut(id) {
     throw Boom.notFound(`Account ${id} not found`)
   }
 
-  auditSignOut(account._id, account.email)
+  await auditSignOut(account._id, account.email)
 }
 
 /**
