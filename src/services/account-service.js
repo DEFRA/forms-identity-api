@@ -129,8 +129,9 @@ export async function updateEmail(uid, id) {
     return outcome
   }
 
-  const { accountId, oldEmail, newEmail } = outcome
-  await auditAfterCommit(() => auditEmailChanged(accountId, oldEmail, newEmail))
+  await auditAfterCommit(() =>
+    auditEmailChanged(outcome.accountId, outcome.oldEmail, outcome.newEmail)
+  )
 
   return { status: STATUS.VALID }
 }
