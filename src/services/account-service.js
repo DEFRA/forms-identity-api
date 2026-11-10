@@ -205,9 +205,13 @@ export async function updatePhone(uid, id, phone) {
     return outcome
   }
 
-  const { accountId, email, oldPhone, newPhone } = outcome
   await auditAfterCommit(() =>
-    auditPhoneChanged(accountId, email, oldPhone, newPhone)
+    auditPhoneChanged(
+      outcome.accountId,
+      outcome.email,
+      outcome.oldPhone,
+      outcome.newPhone
+    )
   )
 
   return { status: STATUS.VALID }

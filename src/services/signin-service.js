@@ -93,19 +93,24 @@ export async function completeSignup(uid, phone) {
     return result
   }
 
-  const { account, created } = result
-  setUserId(account._id)
+  setUserId(result.account._id)
 
   // Only the signup that made the account registered it; a signup that
   // found the account already there is just a sign-in
-  if (created) {
+  if (result.created) {
     await auditAfterCommit(() =>
-      auditRegistration(account._id, account.email, account.phone)
+      auditRegistration(
+        result.account._id,
+        result.account.email,
+        result.account.phone
+      )
     )
   }
-  await auditAfterCommit(() => auditSignIn(account._id, account.email, uid))
+  await auditAfterCommit(() =>
+    auditSignIn(result.account._id, result.account.email, uid)
+  )
 
-  return { status: STATUS.SIGNED_IN, accountId: account._id }
+  return { status: STATUS.SIGNED_IN, accountId: result.account._id }
 }
 
 /**
