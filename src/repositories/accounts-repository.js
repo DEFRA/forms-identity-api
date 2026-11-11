@@ -24,25 +24,34 @@ function coll() {
 
 /**
  * @param {string} email - already normalised (lowercased) by the service
+ * @param {ClientSession} [session]
  */
-export function findByEmail(email) {
-  return coll().findOne({ email, status: { $ne: 'deleted' } })
+export function findByEmail(email, session) {
+  return coll().findOne(
+    { email, status: { $ne: 'deleted' } },
+    session ? { session } : undefined
+  )
 }
 
 /**
  * @param {string} id
+ * @param {ClientSession} [session]
  */
-export function findById(id) {
-  return coll().findOne({ _id: id, status: { $ne: 'deleted' } })
+export function findById(id, session) {
+  return coll().findOne(
+    { _id: id, status: { $ne: 'deleted' } },
+    session ? { session } : undefined
+  )
 }
 
 /**
  * Inserts an account document; a duplicate email rejects on the unique
  * index (see {@link isDuplicateKeyError})
  * @param {AccountDocument} account
+ * @param {ClientSession} [session]
  */
-export async function insert(account) {
-  await coll().insertOne(account)
+export async function insert(account, session) {
+  await coll().insertOne(account, session ? { session } : undefined)
   return account
 }
 
@@ -51,11 +60,16 @@ export async function insert(account) {
  * index (see {@link isDuplicateKeyError})
  * @param {string} id
  * @param {Partial<AccountDocument>} fields
+ * @param {ClientSession} [session]
  */
-export async function update(id, fields) {
-  return coll().updateOne({ _id: id }, { $set: fields })
+export async function update(id, fields, session) {
+  return coll().updateOne(
+    { _id: id },
+    { $set: fields },
+    session ? { session } : undefined
+  )
 }
 
 /**
- * @import { Collection , UpdateResult} from 'mongodb'
+ * @import { Collection, ClientSession, UpdateResult } from 'mongodb'
  */

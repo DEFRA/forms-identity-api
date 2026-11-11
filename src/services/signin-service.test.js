@@ -14,6 +14,7 @@ import {
   auditSignIn
 } from '~/src/lib/audit.js'
 import { sendEmail } from '~/src/lib/notify.js'
+import { client } from '~/src/mongo.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
 import * as otpsRepository from '~/src/repositories/otps-repository.js'
@@ -23,6 +24,7 @@ import {
   createAccount,
   findAccountById
 } from '~/src/services/signin-service.js'
+import { createTransactionSession } from '~/test/helpers/transaction-session.js'
 
 jest.mock('~/src/repositories/otps-repository.js', () => ({
   findOne: jest.fn(),
@@ -42,6 +44,9 @@ jest.mock('~/src/repositories/accounts-repository.js', () => ({
   insert: jest.fn(),
   isDuplicateKeyError: jest.fn()
 }))
+jest.mock('~/src/mongo.js', () => ({
+  client: { startSession: jest.fn() }
+}))
 jest.mock('~/src/lib/notify.js', () => ({
   sendEmail: jest.fn()
 }))
@@ -52,6 +57,16 @@ jest.mock('~/src/lib/audit.js', () => ({
   auditRegistration: jest.fn()
 }))
 jest.mock('~/src/messaging/publish-base.js')
+
+/** @type {ReturnType<typeof createTransactionSession>} */
+let transactionSession
+
+beforeEach(() => {
+  transactionSession = createTransactionSession()
+  jest
+    .mocked(client.startSession)
+    .mockReturnValue(/** @type {never} */ (transactionSession))
+})
 
 /** Codes an address may request in a window before it is locked out */
 const MAX_REQUESTS = 5
@@ -911,12 +926,49 @@ describe('signin service', () => {
 
       const result = await completeSignup('uid-1', '07911 123456')
 
-      expect(accountsRepository.insert).toHaveBeenCalledWith(
+      expect(jest.mocked(accountsRepository.insert).mock.calls[0]).toEqual([
         expect.objectContaining({
           email: 'a@b.com',
           phone: '+447911123456',
           status: 'active'
-        })
+        }),
+        transactionSession
+      ])
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(1)
+      expect(transactionSession.withTransaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          readConcern: { level: 'snapshot' },
+          writeConcern: { w: 'majority' }
+        }
+      )
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+      expect(otpsRepository.findOne).toHaveBeenCalledWith(
+        {
+          uid: 'uid-1',
+          purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
+          verified: true,
+          consumed: false
+        },
+        transactionSession
+      )
+      expect(otpsRepository.update).toHaveBeenCalledWith(
+        {
+          uid: 'uid-1',
+          purpose: PURPOSE.SIGNIN_VERIFY_EMAIL,
+          verified: true,
+          consumed: false
+        },
+        { consumed: true },
+        transactionSession
+      )
+      expect(accountsRepository.findByEmail).toHaveBeenCalledWith(
+        'a@b.com',
+        transactionSession
+      )
+      expect(otpLockoutsRepository.clear).toHaveBeenCalledWith(
+        { target: 'a@b.com' },
+        transactionSession
       )
       expect(result).toEqual({
         status: 'signed-in',
@@ -934,13 +986,9 @@ describe('signin service', () => {
       expect(auditSignIn).toHaveBeenCalledWith(accountId, 'a@b.com', 'uid-1')
     })
 
-    it('audits the existing account when the email already has one (duplicate race)', async () => {
+    it('signs in the existing account without registering it again', async () => {
       await verified()
       const existing = { _id: 'acc-existing', email: 'a@b.com' }
-      jest
-        .mocked(accountsRepository.insert)
-        .mockRejectedValue(new Error('E11000'))
-      jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(true)
       jest
         .mocked(accountsRepository.findByEmail)
         .mockResolvedValue(/** @type {never} */ (existing))
@@ -948,16 +996,116 @@ describe('signin service', () => {
       const result = await completeSignup('uid-1', '07911 123456')
 
       expect(result).toEqual({ status: 'signed-in', accountId: 'acc-existing' })
-      expect(auditRegistration).toHaveBeenCalledWith(
-        'acc-existing',
-        'a@b.com',
-        undefined
-      )
+      expect(accountsRepository.insert).not.toHaveBeenCalled()
+      expect(auditRegistration).not.toHaveBeenCalled()
       expect(auditSignIn).toHaveBeenCalledWith(
         'acc-existing',
         'a@b.com',
         'uid-1'
       )
+    })
+
+    it('runs again in a fresh transaction when a racing signup took the email (duplicate race)', async () => {
+      const docs = await verified()
+      const existing = { _id: 'acc-existing', email: 'a@b.com' }
+      jest.mocked(accountsRepository.insert).mockImplementationOnce(() => {
+        docs[0].consumed = false // the database rolls the consume back
+        return Promise.reject(new Error('E11000'))
+      })
+      jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(true)
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValueOnce(null) // the first run sees no account
+        .mockResolvedValueOnce(/** @type {never} */ (existing))
+
+      const result = await completeSignup('uid-1', '07911 123456')
+
+      expect(result).toEqual({ status: 'signed-in', accountId: 'acc-existing' })
+      expect(client.startSession).toHaveBeenCalledTimes(2)
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(2)
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(2)
+      expect(accountsRepository.insert).toHaveBeenCalledTimes(1)
+      expect(docs[0].consumed).toBe(true)
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).toHaveBeenCalledTimes(1)
+      expect(auditSignIn).toHaveBeenCalledWith(
+        'acc-existing',
+        'a@b.com',
+        'uid-1'
+      )
+    })
+
+    it('gives up when the email is still a duplicate on the second run', async () => {
+      const docs = await verified()
+      const error = new Error('E11000')
+      jest.mocked(accountsRepository.insert).mockImplementation(() => {
+        docs[0].consumed = false // the database rolls the consume back
+        return Promise.reject(error)
+      })
+      jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(true)
+
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
+
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(2)
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).not.toHaveBeenCalled()
+    })
+
+    it('does not run again for an error that is not a duplicate', async () => {
+      await verified()
+      const error = new Error('lockout clear failed')
+      jest
+        .mocked(accountsRepository.insert)
+        .mockImplementation((account) => Promise.resolve(account))
+      jest.mocked(otpLockoutsRepository.clear).mockRejectedValue(error)
+      jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(false)
+
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
+
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(1)
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).not.toHaveBeenCalled()
+    })
+
+    it('rolls back the account insert and OTP consume when auditing the registration fails', async () => {
+      const docs = await verified()
+      jest
+        .mocked(accountsRepository.insert)
+        .mockImplementation((account) => Promise.resolve(account))
+      const error = new Error('SNS is down')
+      jest.mocked(auditRegistration).mockImplementation(() => {
+        // the database rolls every write in the transaction back, including
+        // the consume that ran earlier in the same callback
+        docs[0].consumed = false
+        return Promise.reject(error)
+      })
+
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
+
+      expect(docs[0].consumed).toBe(false)
+      expect(auditSignIn).not.toHaveBeenCalled()
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('rolls back the OTP consume when auditing the sign-in fails for an existing account', async () => {
+      const docs = await verified()
+      const existing = { _id: 'acc-existing', email: 'a@b.com' }
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ (existing))
+      const error = new Error('SNS is down')
+      jest.mocked(auditSignIn).mockImplementation(() => {
+        docs[0].consumed = false
+        return Promise.reject(error)
+      })
+
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
+
+      expect(docs[0].consumed).toBe(false)
+      expect(accountsRepository.insert).not.toHaveBeenCalled()
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
     })
 
     it.each([
@@ -992,9 +1140,10 @@ describe('signin service', () => {
       const result = await completeSignup('uid-1', '07700900000')
 
       expect(result).toMatchObject({ status: 'signed-in' })
-      expect(accountsRepository.insert).toHaveBeenCalledWith(
-        expect.objectContaining({ email, phone: '+447700900000' })
-      )
+      expect(jest.mocked(accountsRepository.insert).mock.calls[0]).toEqual([
+        expect.objectContaining({ email, phone: '+447700900000' }),
+        transactionSession
+      ])
     })
 
     it('rejects completion without a verified record (out-of-order call)', async () => {
@@ -1027,9 +1176,84 @@ describe('signin service', () => {
       expect(result).toEqual({ status: 'invalid' })
       expect(accountsRepository.insert).toHaveBeenCalledTimes(1)
     })
+
+    it('does not audit or sign in when a transaction write fails', async () => {
+      await verified()
+      const error = new Error('account insert failed')
+      jest.mocked(accountsRepository.insert).mockRejectedValue(error)
+
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
+
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(auditSignIn).not.toHaveBeenCalled()
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('createAccount', () => {
+    it('registers the account it inserts', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.insert)
+        .mockImplementation((account) => Promise.resolve(account))
+
+      const account = await createAccount(
+        'Citizen@Example.com',
+        '+447911123456'
+      )
+
+      expect(jest.mocked(accountsRepository.insert).mock.calls[0]).toEqual([
+        expect.objectContaining({ email: 'citizen@example.com' }),
+        transactionSession
+      ])
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(1)
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+      expect(auditRegistration).toHaveBeenCalledTimes(1)
+      expect(auditRegistration).toHaveBeenCalledWith(
+        account._id,
+        'citizen@example.com',
+        '+447911123456'
+      )
+    })
+
+    it('rolls back the account insert when auditing the registration fails', async () => {
+      build()
+      /** @type {unknown[]} */
+      const inserted = []
+      jest.mocked(accountsRepository.insert).mockImplementation((account) => {
+        inserted.push(account)
+        return Promise.resolve(account)
+      })
+      const error = new Error('SNS is down')
+      jest.mocked(auditRegistration).mockImplementation(() => {
+        // the database rolls the insert back when the transaction aborts
+        inserted.length = 0
+        return Promise.reject(error)
+      })
+
+      await expect(
+        createAccount('citizen@example.com', '+447911123456')
+      ).rejects.toBe(error)
+
+      expect(inserted).toHaveLength(0)
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not register an account that was not inserted', async () => {
+      build()
+      jest
+        .mocked(accountsRepository.insert)
+        .mockRejectedValue(new Error('E11000'))
+      jest.mocked(accountsRepository.isDuplicateKeyError).mockReturnValue(true)
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ ({ _id: 'abc' }))
+
+      await createAccount('citizen@example.com', '+447911123456')
+
+      expect(auditRegistration).not.toHaveBeenCalled()
+    })
+
     it('returns the existing account on a duplicate email', async () => {
       build()
       const existing = { _id: 'abc', email: 'citizen@example.com' }
