@@ -7,7 +7,6 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
-import { logger } from '~/src/helpers/logging/logger.js'
 import {
   auditOtpIssued,
   auditOtpLockout,
@@ -1069,22 +1068,44 @@ describe('signin service', () => {
       expect(auditSignIn).not.toHaveBeenCalled()
     })
 
-    it('still signs the user in when publishing an audit event fails after the commit', async () => {
-      await verified()
+    it('rolls back the account insert and OTP consume when auditing the registration fails', async () => {
+      const docs = await verified()
       jest
         .mocked(accountsRepository.insert)
         .mockImplementation((account) => Promise.resolve(account))
       const error = new Error('SNS is down')
-      jest.mocked(auditRegistration).mockRejectedValue(error)
-      jest.mocked(auditSignIn).mockRejectedValue(error)
-      const logError = jest.spyOn(logger, 'error').mockImplementation()
+      jest.mocked(auditRegistration).mockImplementation(() => {
+        // the database rolls every write in the transaction back, including
+        // the consume that ran earlier in the same callback
+        docs[0].consumed = false
+        return Promise.reject(error)
+      })
 
-      const result = await completeSignup('uid-1', '07911 123456')
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
 
-      expect(result).toMatchObject({ status: 'signed-in' })
-      expect(auditSignIn).toHaveBeenCalledTimes(1)
-      expect(logError).toHaveBeenCalledTimes(2)
-      expect(logError).toHaveBeenCalledWith(error, expect.any(String))
+      expect(docs[0].consumed).toBe(false)
+      expect(auditSignIn).not.toHaveBeenCalled()
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('rolls back the OTP consume when auditing the sign-in fails for an existing account', async () => {
+      const docs = await verified()
+      const existing = { _id: 'acc-existing', email: 'a@b.com' }
+      jest
+        .mocked(accountsRepository.findByEmail)
+        .mockResolvedValue(/** @type {never} */ (existing))
+      const error = new Error('SNS is down')
+      jest.mocked(auditSignIn).mockImplementation(() => {
+        docs[0].consumed = false
+        return Promise.reject(error)
+      })
+
+      await expect(completeSignup('uid-1', '07911 123456')).rejects.toBe(error)
+
+      expect(docs[0].consumed).toBe(false)
+      expect(accountsRepository.insert).not.toHaveBeenCalled()
+      expect(auditRegistration).not.toHaveBeenCalled()
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
     })
 
     it.each([
@@ -1181,12 +1202,41 @@ describe('signin service', () => {
         '+447911123456'
       )
 
+      expect(jest.mocked(accountsRepository.insert).mock.calls[0]).toEqual([
+        expect.objectContaining({ email: 'citizen@example.com' }),
+        transactionSession
+      ])
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(1)
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
       expect(auditRegistration).toHaveBeenCalledTimes(1)
       expect(auditRegistration).toHaveBeenCalledWith(
         account._id,
         'citizen@example.com',
         '+447911123456'
       )
+    })
+
+    it('rolls back the account insert when auditing the registration fails', async () => {
+      build()
+      /** @type {unknown[]} */
+      const inserted = []
+      jest.mocked(accountsRepository.insert).mockImplementation((account) => {
+        inserted.push(account)
+        return Promise.resolve(account)
+      })
+      const error = new Error('SNS is down')
+      jest.mocked(auditRegistration).mockImplementation(() => {
+        // the database rolls the insert back when the transaction aborts
+        inserted.length = 0
+        return Promise.reject(error)
+      })
+
+      await expect(
+        createAccount('citizen@example.com', '+447911123456')
+      ).rejects.toBe(error)
+
+      expect(inserted).toHaveLength(0)
+      expect(transactionSession.endSession).toHaveBeenCalledTimes(1)
     })
 
     it('does not register an account that was not inserted', async () => {

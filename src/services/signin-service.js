@@ -4,7 +4,6 @@ import { setUserId } from '@defra/forms-common'
 import Boom from '@hapi/boom'
 
 import { PURPOSE, STATUS } from '~/src/constants.js'
-import { auditAfterCommit } from '~/src/lib/audit-after-commit.js'
 import { auditRegistration, auditSignIn } from '~/src/lib/audit.js'
 import { normaliseMobile } from '~/src/lib/phone.js'
 import { runInTransaction } from '~/src/lib/transaction.js'
@@ -15,9 +14,10 @@ import { isTestAddress } from '~/src/services/test-otp-service.js'
 
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
- * for this uid. Account creation, OTP consumption and lockout clearing commit
- * together, so a failed operation leaves the signup state unchanged. The
- * audit events follow the commit, because they cannot be rolled back.
+ * for this uid. Account creation, OTP consumption, lockout clearing and the
+ * audit events all commit together, so a failed audit publish leaves the
+ * signup state unchanged rather than signing a user in without a record of
+ * it.
  * @param {string} uid
  * @param {string} phone
  * @returns {Promise<CompleteResult>}
@@ -72,6 +72,11 @@ export async function completeSignup(uid, phone) {
 
       await clearRequestCount(doc.target, session)
 
+      if (!existing) {
+        await auditRegistration(account._id, account.email, account.phone)
+      }
+      await auditSignIn(account._id, account.email, uid)
+
       return { status: STATUS.SIGNED_IN, account, created: !existing }
     })
 
@@ -95,29 +100,15 @@ export async function completeSignup(uid, phone) {
 
   setUserId(result.account._id)
 
-  // Only the signup that made the account registered it; a signup that
-  // found the account already there is just a sign-in
-  if (result.created) {
-    await auditAfterCommit(() =>
-      auditRegistration(
-        result.account._id,
-        result.account.email,
-        result.account.phone
-      )
-    )
-  }
-  await auditAfterCommit(() =>
-    auditSignIn(result.account._id, result.account.email, uid)
-  )
-
   return { status: STATUS.SIGNED_IN, accountId: result.account._id }
 }
 
 /**
- * Creates an account. On a duplicate email (racing interaction, or a
- * crash-retry after creation but before the OTP was consumed) the unique
- * index rejects the insert and the existing account is returned instead —
- * the caller signs that account in.
+ * Creates an account. The insert and its registration audit commit
+ * together, so a failed audit publish leaves no account behind. On a
+ * duplicate email (racing interaction, or a crash-retry after creation but
+ * before the OTP was consumed) the unique index rejects the insert and the
+ * existing account is returned instead — the caller signs that account in.
  * @param {string} email
  * @param {string} phone - E.164
  */
@@ -125,7 +116,10 @@ export async function createAccount(email, phone) {
   const account = buildAccount(email, phone)
 
   try {
-    await accountsRepository.insert(account)
+    await runInTransaction(async (session) => {
+      await accountsRepository.insert(account, session)
+      await auditRegistration(account._id, account.email, account.phone)
+    })
   } catch (err) {
     if (accountsRepository.isDuplicateKeyError(err)) {
       const existing = await accountsRepository.findByEmail(email.toLowerCase())
@@ -135,10 +129,6 @@ export async function createAccount(email, phone) {
     }
     throw err
   }
-
-  await auditAfterCommit(() =>
-    auditRegistration(account._id, account.email, account.phone)
-  )
 
   return account
 }

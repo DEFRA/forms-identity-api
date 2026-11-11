@@ -40,11 +40,12 @@ export function rollback(result) {
  * repository call that belongs to the transaction.
  *
  * The callback can run more than once, because the driver retries the whole
- * transaction on a transient error such as a write conflict. Keep it to
- * database work (reads included, so a retry sees fresh state) and do any
- * side effect that cannot be undone, such as publishing an audit event, after
- * this resolves. Any error thrown from the callback rolls the transaction
- * back and is rethrown.
+ * transaction on a transient error such as a write conflict — keep reads in
+ * it too, so a retry sees fresh state. Audit publishing is deliberately run
+ * inside the callback alongside the database writes it belongs with, so
+ * that a failed publish rolls the writes back instead of leaving the
+ * database and the audit trail disagreeing with each other. Any error
+ * thrown from the callback rolls the transaction back and is rethrown.
  * @template T
  * @param {(session: ClientSession) => Promise<T>} callback
  * @returns {Promise<T>}

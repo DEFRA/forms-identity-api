@@ -2,7 +2,6 @@
 import { audit } from '@defra/cdp-auditing'
 import Boom from '@hapi/boom'
 
-import { logger } from '~/src/helpers/logging/logger.js'
 import { publishEvent } from '~/src/messaging/publish-base.js'
 import { client } from '~/src/mongo.js'
 import {
@@ -276,12 +275,20 @@ describe('account service', () => {
       expect(session.endSession).toHaveBeenCalledTimes(1)
     })
 
-    it('should still report success when publishing the audit event fails after the commit', async () => {
+    it('should roll back the email change and OTP consumption when publishing the audit event fails', async () => {
       // @ts-expect-error - partial mock of test data
       jest.mocked(findById).mockResolvedValueOnce({
         status: 'active',
         email: 'current-email@test.com',
         _id: 'acc-id'
+      })
+      /** @type {string | undefined} */
+      let committedEmail
+      jest.mocked(updateAccount).mockImplementation((_id, fields) => {
+        committedEmail = /** @type {{ email?: string }} */ (fields).email
+        return Promise.resolve(
+          /** @type {never} */ ({ matchedCount: 1, modifiedCount: 1 })
+        )
       })
       jest.mocked(update).mockResolvedValue(true)
       jest
@@ -290,13 +297,18 @@ describe('account service', () => {
         .mockResolvedValueOnce(validOtp)
         // @ts-expect-error - partial mock of test data
         .mockResolvedValueOnce(validOtp)
-      jest.mocked(publishEvent).mockRejectedValue(new Error('SNS is down'))
-      const logError = jest.spyOn(logger, 'error').mockImplementation()
+      const error = new Error('SNS is down')
+      jest.mocked(publishEvent).mockImplementation(() => {
+        // the database rolls the whole transaction back, including the
+        // account update that ran earlier in the same callback
+        committedEmail = undefined
+        return Promise.reject(error)
+      })
 
-      const res = await updateEmail(uid, id)
+      await expect(updateEmail(uid, id)).rejects.toBe(error)
 
-      expect(res).toEqual({ status: 'valid' })
-      expect(logError).toHaveBeenCalledTimes(1)
+      expect(committedEmail).toBeUndefined()
+      expect(session.endSession).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -435,6 +447,41 @@ describe('account service', () => {
       )
     })
 
+    it('should roll back the phone change and OTP consumption when publishing the audit event fails', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findById).mockResolvedValueOnce({
+        status: 'active',
+        email: 'current-email@test.com',
+        phone: '+447500111111',
+        _id: 'acc-id'
+      })
+      /** @type {string | undefined} */
+      let committedPhone
+      jest.mocked(updateAccount).mockImplementation((_id, fields) => {
+        committedPhone = /** @type {{ phone?: string }} */ (fields).phone
+        return Promise.resolve(
+          /** @type {never} */ ({ matchedCount: 1, modifiedCount: 1 })
+        )
+      })
+      jest.mocked(update).mockResolvedValueOnce(true)
+      jest
+        .mocked(findOne)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce(validOtp)
+      const error = new Error('SNS is down')
+      jest.mocked(publishEvent).mockImplementation(() => {
+        // the database rolls the whole transaction back, including the
+        // account update that ran earlier in the same callback
+        committedPhone = undefined
+        return Promise.reject(error)
+      })
+
+      await expect(updatePhone(uid, id, newPhone)).rejects.toBe(error)
+
+      expect(committedPhone).toBeUndefined()
+      expect(session.endSession).toHaveBeenCalledTimes(1)
+    })
+
     it('should roll back, without auditing, when the OTP was already spent', async () => {
       // @ts-expect-error - partial mock of test data
       jest.mocked(findById).mockResolvedValueOnce({
@@ -567,6 +614,32 @@ describe('account service', () => {
         accountId: id,
         email
       })
+    })
+
+    it('should roll back the account deletion and OTP consumption when publishing the audit event fails', async () => {
+      // @ts-expect-error - partial mock of test data
+      jest.mocked(findOne).mockResolvedValueOnce(deleteOtp)
+      /** @type {string | undefined} */
+      let committedStatus
+      jest.mocked(updateAccount).mockImplementation((_id, fields) => {
+        committedStatus = /** @type {{ status?: string }} */ (fields).status
+        return Promise.resolve(
+          /** @type {never} */ ({ matchedCount: 1, modifiedCount: 1 })
+        )
+      })
+      jest.mocked(update).mockResolvedValueOnce(true)
+      const error = new Error('SNS is down')
+      jest.mocked(publishEvent).mockImplementation(() => {
+        // the database rolls the whole transaction back, including the
+        // account update that ran earlier in the same callback
+        committedStatus = undefined
+        return Promise.reject(error)
+      })
+
+      await expect(deleteAccount(uid, id)).rejects.toBe(error)
+
+      expect(committedStatus).toBeUndefined()
+      expect(session.endSession).toHaveBeenCalledTimes(1)
     })
   })
 

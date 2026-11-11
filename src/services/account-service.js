@@ -1,7 +1,6 @@
 import Boom from '@hapi/boom'
 
 import { PURPOSE, STATUS } from '~/src/constants.js'
-import { auditAfterCommit } from '~/src/lib/audit-after-commit.js'
 import {
   auditAccountDeleted,
   auditEmailChanged,
@@ -106,6 +105,8 @@ export async function updateEmail(uid, id) {
       await clearRequestCount(otpPhone.target, session)
       await clearRequestCount(newEmail, session)
 
+      await auditEmailChanged(account._id, oldEmail, newEmail)
+
       return {
         status: STATUS.VALID,
         accountId: account._id,
@@ -128,10 +129,6 @@ export async function updateEmail(uid, id) {
   if (outcome.status !== STATUS.VALID) {
     return outcome
   }
-
-  await auditAfterCommit(() =>
-    auditEmailChanged(outcome.accountId, outcome.oldEmail, outcome.newEmail)
-  )
 
   return { status: STATUS.VALID }
 }
@@ -193,6 +190,8 @@ export async function updatePhone(uid, id, phone) {
     // Clear any previous OTP requests from the same email
     await clearRequestCount(otpEmail.target, session)
 
+    await auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
+
     return {
       status: STATUS.VALID,
       accountId: account._id,
@@ -205,15 +204,6 @@ export async function updatePhone(uid, id, phone) {
   if (outcome.status !== STATUS.VALID) {
     return outcome
   }
-
-  await auditAfterCommit(() =>
-    auditPhoneChanged(
-      outcome.accountId,
-      outcome.email,
-      outcome.oldPhone,
-      outcome.newPhone
-    )
-  )
 
   return { status: STATUS.VALID }
 }
@@ -267,16 +257,15 @@ export async function deleteAccount(uid, id) {
     // Clear any previous OTP requests from the same email
     await clearRequestCount(otpEmail.target, session)
 
+    await auditAccountDeleted(id, otpEmail.target)
+    await auditSignOut(id, otpEmail.target)
+
     return { status: STATUS.VALID, email: otpEmail.target }
   })
 
   if (outcome.status !== STATUS.VALID) {
     return outcome
   }
-
-  const { email } = outcome
-  await auditAfterCommit(() => auditAccountDeleted(id, email))
-  await auditAfterCommit(() => auditSignOut(id, email))
 
   return { status: STATUS.VALID }
 }
