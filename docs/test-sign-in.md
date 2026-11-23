@@ -14,6 +14,9 @@ Tests and developers can sign in with a test email address. No email is sent. Yo
 3. You read the code from the database, or from the API with the secret `OTP_TEST_READ_SECRET`.
 4. You type the code into the sign-in page.
 
+> [!NOTE]
+> The examples use `me@example.forms.defra.gov.uk`. Replace it with the address you used to sign in. You can use any name before `@example.forms.defra.gov.uk`.
+
 ## Get a code with database access
 
 This needs no deployment.
