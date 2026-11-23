@@ -41,30 +41,21 @@ A test account can use a mobile number in the Ofcom fictional range, 07700 90000
 | `401`  | The `Authorization` header is missing, or the secret is wrong             |
 | `404`  | There is no code for this address and purpose, or the code is out of date |
 
-### Lockout
-
-The service locks an address for 2 hours after 5 requests for a code in 2 hours. This applies to test addresses too. To continue before then, remove the address from the `otp-lockouts` collection (see [CDP Terminal](#cdp-terminal)), or use a different test address.
-
 ## Deploy the service
 
-`OTP_TEST_READ_SECRET` is required. The service does not start without it. Set it in every environment, production included, because the smoke tests sign in there.
-
-1. Make a long random value for each environment, for example with `openssl rand -base64 32`. Use a different value in each environment, so that a value from one environment does not work in another.
-2. Add the value as the secret `OTP_TEST_READ_SECRET` on forms-identity-api in the CDP Portal.
-3. Add the same value to each test suite that signs in in that environment.
-4. Deploy forms-identity-api again, so that it reads the new secret.
+Set the secret `OTP_TEST_READ_SECRET` on forms-identity-api in the CDP Portal, with a different value in each environment. The service does not start without it.
 
 > [!WARNING]
-> The secret is shared by three services: forms-identity-api, forms-smoke-test and forms-perf-test. If you change it in one environment, change it on all three in that environment, then deploy forms-identity-api again. A test suite with a different value gets `401` when it reads the code, and its sign-in fails.
+> forms-identity-api, forms-smoke-test and forms-perf-test share the secret. If you change it, change it for all three services. Otherwise the tests get `401` when they read the code, and sign-in fails.
 
 ## Set up the smoke and perf tests
 
 Both test suites read the code with the same secret. Their READMEs give the full setup.
 
-| Test suite                                                    | Test addresses                             | Settings on the test suite                 |
-| ------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------ |
-| [forms-smoke-test](https://github.com/DEFRA/forms-smoke-test) | `smoke-test@example.forms.defra.gov.uk`    | `OTP_TEST_READ_SECRET`, `IDENTITY_API_URL` |
-| [forms-perf-test](https://github.com/DEFRA/forms-perf-test)   | `perf-<thread>@example.forms.defra.gov.uk` | `OTP_TEST_READ_SECRET`, `identityApiBase`  |
+| Test suite                                                    | Test addresses                             |
+| ------------------------------------------------------------- | ------------------------------------------ |
+| [forms-smoke-test](https://github.com/DEFRA/forms-smoke-test) | `smoke-test@example.forms.defra.gov.uk`    |
+| [forms-perf-test](https://github.com/DEFRA/forms-perf-test)   | `perf-<thread>@example.forms.defra.gov.uk` |
 
 Both suites also need `USE_SIGN_IN_FEATURE=true` on forms-runner.
 
