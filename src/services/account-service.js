@@ -141,7 +141,7 @@ export async function updateEmail(uid, id) {
  * @param {string} phone
  */
 export async function updatePhone(uid, id, phone) {
-  const outcome = await runInTransaction(async (session) => {
+  return await runInTransaction(async (session) => {
     // Check we have the verified 'email' OTP record for the correct account
     const filterEmailOtp = {
       uid,
@@ -193,19 +193,9 @@ export async function updatePhone(uid, id, phone) {
     await auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
 
     return {
-      status: STATUS.VALID,
-      accountId: account._id,
-      email: account.email,
-      oldPhone,
-      newPhone
+      status: STATUS.VALID
     }
   })
-
-  if (outcome.status !== STATUS.VALID) {
-    return outcome
-  }
-
-  return { status: STATUS.VALID }
 }
 
 /**
