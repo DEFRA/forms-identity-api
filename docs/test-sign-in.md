@@ -79,32 +79,14 @@ IDENTITY_API_URL=http://localhost:3010
 OTP_TEST_READ_SECRET=local-test-read-secret
 ```
 
-### CDP Terminal
+### CDP
 
-CDP Terminal is available in non-production environments only. Launch it from the Terminal tab of forms-identity-api in the CDP Portal. The session has the permissions of forms-identity-api, so it can read the service database.
+There are two ways to read a code on CDP.
 
-Read the code with `curl`:
+1. **MongoDB web viewer (preferred).** Open the MongoDB web viewer of forms-identity-api in the CDP Portal. In the `test-otps` collection, find the record with your address as `target` and the purpose as `purpose`. The `code` field holds the code in plain text. This needs no secret.
+2. **`curl`.** Use the command above. You need the value of `OTP_TEST_READ_SECRET` for that environment.
 
 ```bash
 IDENTITY_API_URL="https://forms-identity-api.${ENVIRONMENT}.cdp-int.defra.cloud"
 OTP_TEST_READ_SECRET='<the value for this environment>'
 ```
-
-Or read it from the database with `mongosh`. This needs no secret:
-
-```js
-db['test-otps'].findOne(
-  { target: 'me@example.forms.defra.gov.uk', purpose: 'SIGNIN_VERIFY_EMAIL' },
-  { code: 1, expireAt: 1 }
-)
-```
-
-Remove a lockout:
-
-```js
-db['otp-lockouts'].deleteOne({ target: 'me@example.forms.defra.gov.uk' })
-```
-
-The service stores addresses in lowercase, so use a lowercase address in a query.
-
-The platform records every CDP Terminal session.
