@@ -35,27 +35,28 @@ export function rollback(result) {
 }
 
 /**
- * Runs the callback in a MongoDB transaction: either every write made through
+ * Runs the unitOrWork in a MongoDB transaction: either every write made through
  * the session commits, or none of them do. Pass the session to each
  * repository call that belongs to the transaction.
  *
- * The callback can run more than once, because the driver retries the whole
+ * The unitOrWork can run more than once, because the driver retries the whole
  * transaction on a transient error such as a write conflict — keep reads in
  * it too, so a retry sees fresh state. Audit publishing is deliberately run
  * inside the callback alongside the database writes it belongs with, so
- * that a failed publish rolls the writes back instead of leaving the
- * database and the audit trail disagreeing with each other. Any error
- * thrown from the callback rolls the transaction back and is rethrown.
+ * that a failed publish rolls the writes back. SNS and the audit logger are
+ * not part of the MongoDB transaction: a later failure or transaction retry
+ * can leave published events for rolled-back writes or duplicate events.
+ * Any error thrown from the callback rolls the transaction back and is rethrown.
  * @template T
- * @param {(session: ClientSession) => Promise<T>} callback
+ * @param {(session: ClientSession) => Promise<T>} unitOfWork
  * @returns {Promise<T>}
  */
-export async function runInTransaction(callback) {
+export async function runInTransaction(unitOfWork) {
   const session = client.startSession()
 
   try {
     return await session.withTransaction(
-      () => callback(session),
+      () => unitOfWork(session),
       TRANSACTION_OPTIONS
     )
   } catch (err) {

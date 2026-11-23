@@ -68,13 +68,14 @@ export async function update(filter, fields, session) {
 /**
  * Atomically increments the attempt counter, returning the updated record
  * @param {Filter<OtpDocument>} filter
+ * @param {ClientSession} [session]
  * @returns {Promise<OtpDocument | null>} null when no record matches
  */
-export function incrementAttempts(filter) {
+export function incrementAttempts(filter, session) {
   return coll().findOneAndUpdate(
     filter,
     { $inc: { attempts: 1 } },
-    { returnDocument: 'after' }
+    { returnDocument: 'after', ...(session && { session }) }
   )
 }
 

@@ -21,9 +21,9 @@ import * as otpsRepository from '~/src/repositories/otps-repository.js'
 import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 import {
   completeSignup,
-  createAccount,
   findAccountById
 } from '~/src/services/signin-service.js'
+import { createAccount } from '~/src/services/test-helper.js'
 import { createTransactionSession } from '~/test/helpers/transaction-session.js'
 
 jest.mock('~/src/repositories/otps-repository.js', () => ({
@@ -36,7 +36,8 @@ jest.mock('~/src/repositories/otp-lockouts-repository.js', () => ({
   findOne: jest.fn(),
   update: jest.fn(),
   clear: jest.fn(),
-  incrementRequests: jest.fn()
+  incrementRequests: jest.fn(),
+  isDuplicateKeyError: jest.fn()
 }))
 jest.mock('~/src/repositories/accounts-repository.js', () => ({
   findByEmail: jest.fn(),
@@ -358,6 +359,22 @@ describe('signin service', () => {
   })
 
   describe('requestOtp lockout', () => {
+    it('retries the transaction when a concurrent request creates the counter', async () => {
+      build()
+      const error = new Error('duplicate target')
+      jest
+        .mocked(otpLockoutsRepository.isDuplicateKeyError)
+        .mockReturnValue(true)
+      jest
+        .mocked(otpLockoutsRepository.incrementRequests)
+        .mockRejectedValueOnce(error)
+
+      await expect(request('uid-race')).resolves.toMatch(/^\d{6}$/)
+
+      expect(transactionSession.withTransaction).toHaveBeenCalledTimes(2)
+      expect(counters[0].requests).toBe(1)
+    })
+
     it('issues the codes up to the limit', async () => {
       build()
 
@@ -753,6 +770,11 @@ describe('signin service', () => {
           /** @type {never} */ ({ _id: 'acc-1', email: 'a@b.com' })
         )
       const code = await request('uid-1')
+      let auditUserId
+      jest.mocked(auditSignIn).mockImplementation(() => {
+        auditUserId = getUserId()
+        return Promise.resolve()
+      })
 
       const userId = await runWithLogContext(createLogContext(), async () => {
         await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
@@ -761,6 +783,7 @@ describe('signin service', () => {
       })
 
       expect(userId).toBe('acc-1')
+      expect(auditUserId).toBe('acc-1')
     })
 
     it('audits the sign in against the interaction it happened on', async () => {
@@ -791,6 +814,7 @@ describe('signin service', () => {
 
       expect(result).toEqual({ status: 'invalid' })
       expect(auditSignIn).not.toHaveBeenCalled()
+      expect(counters[0].requests).toBe(1)
     })
 
     it('requires the phone step when no account exists', async () => {
@@ -915,6 +939,9 @@ describe('signin service', () => {
       const docs = build()
       const code = await request('uid-1')
       await verifyOtp('uid-1', code, PURPOSE.SIGNIN_VERIFY_EMAIL)
+      jest.mocked(client.startSession).mockClear()
+      transactionSession.withTransaction.mockClear()
+      transactionSession.endSession.mockClear()
       return docs
     }
 

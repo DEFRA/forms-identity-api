@@ -14,10 +14,8 @@ import { isTestAddress } from '~/src/services/test-otp-service.js'
 
 /**
  * Completes JIT signup: only legal against a verified, unconsumed record
- * for this uid. Account creation, OTP consumption, lockout clearing and the
- * audit events all commit together, so a failed audit publish leaves the
- * signup state unchanged rather than signing a user in without a record of
- * it.
+ * for this uid. Account creation, OTP consumption and lockout clearing
+ * commit together, and a failed audit publish rolls the database writes back.
  * @param {string} uid
  * @param {string} phone
  * @returns {Promise<CompleteResult>}
@@ -104,41 +102,11 @@ export async function completeSignup(uid, phone) {
 }
 
 /**
- * Creates an account. The insert and its registration audit commit
- * together, so a failed audit publish leaves no account behind. On a
- * duplicate email (racing interaction, or a crash-retry after creation but
- * before the OTP was consumed) the unique index rejects the insert and the
- * existing account is returned instead — the caller signs that account in.
- * @param {string} email
- * @param {string} phone - E.164
- */
-export async function createAccount(email, phone) {
-  const account = buildAccount(email, phone)
-
-  try {
-    await runInTransaction(async (session) => {
-      await accountsRepository.insert(account, session)
-      await auditRegistration(account._id, account.email, account.phone)
-    })
-  } catch (err) {
-    if (accountsRepository.isDuplicateKeyError(err)) {
-      const existing = await accountsRepository.findByEmail(email.toLowerCase())
-      if (existing) {
-        return existing
-      }
-    }
-    throw err
-  }
-
-  return account
-}
-
-/**
  * @param {string} email
  * @param {string} phone
  * @returns {AccountDocument}
  */
-function buildAccount(email, phone) {
+export function buildAccount(email, phone) {
   const now = new Date()
 
   return {

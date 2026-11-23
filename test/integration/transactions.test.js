@@ -9,7 +9,7 @@ import {
   db
 } from '~/src/mongo.js'
 import { clear } from '~/src/repositories/otp-lockouts-repository.js'
-import { createAccount } from '~/src/services/signin-service.js'
+import { createAccount } from '~/src/services/test-helper.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
@@ -21,7 +21,7 @@ jest.mock('~/src/repositories/otp-lockouts-repository.js', () => ({
   clear: jest.fn()
 }))
 
-const { inject, requestCode, verify } = setupSigninFlow()
+const { inject, requestCode, requestCodeResponse, verify } = setupSigninFlow()
 
 const actualClear = jest.requireActual(
   '~/src/repositories/otp-lockouts-repository.js'
@@ -58,6 +58,83 @@ beforeEach(() => {
 })
 
 describe('transactions', () => {
+  describe('OTP audit failures', () => {
+    it('rolls back the request count and lockout when publishing fails', async () => {
+      for (let i = 0; i < 5; i++) {
+        await requestCode(`uid-limit-${i}`)
+      }
+      jest.mocked(publishEvent).mockRejectedValueOnce(new Error('SNS failed'))
+
+      const failed = await requestCodeResponse('uid-limit-failed')
+
+      expect(failed.statusCode).toBe(500)
+      await expect(
+        db.collection(OTP_LOCKOUTS_COLLECTION_NAME).findOne({
+          target: 'citizen@example.com'
+        })
+      ).resolves.toMatchObject({ requests: 5, lockedUntil: null })
+      const retried = await requestCodeResponse('uid-limit-retry')
+      expect(JSON.parse(retried.payload).status).toBe('locked-out')
+    })
+
+    it.each([0, 4])(
+      'rolls back a failed guess and lockout when publishing fails after %i attempts',
+      async (previousAttempts) => {
+        const code = await requestCode('uid-guess')
+        const wrong = code === '000000' ? '111111' : '000000'
+        for (let i = 0; i < previousAttempts; i++) {
+          await verify('uid-guess', wrong)
+        }
+        jest.mocked(publishEvent).mockRejectedValueOnce(new Error('SNS failed'))
+
+        const failed = await inject({
+          method: 'POST',
+          url: '/otp/verify',
+          payload: { uid: 'uid-guess', code: wrong }
+        })
+
+        expect(failed.statusCode).toBe(500)
+        await expect(
+          db.collection(OTPS_COLLECTION_NAME).findOne({ uid: 'uid-guess' })
+        ).resolves.toMatchObject({
+          attempts: previousAttempts,
+          consumed: false
+        })
+        const retried = await verify('uid-guess', wrong)
+        expect(retried.status).toBe(
+          previousAttempts === 4
+            ? 'invalid-code-consumed-or-expired'
+            : 'invalid'
+        )
+      }
+    )
+
+    it('rolls back OTP consumption and request count clearing when sign-in publishing fails', async () => {
+      await createAccount('citizen@example.com', '+447911123456')
+      const code = await requestCode('uid-signin')
+      jest.mocked(publishEvent).mockRejectedValueOnce(new Error('SNS failed'))
+
+      const failed = await inject({
+        method: 'POST',
+        url: '/otp/verify',
+        payload: { uid: 'uid-signin', code }
+      })
+
+      expect(failed.statusCode).toBe(500)
+      await expect(
+        db.collection(OTPS_COLLECTION_NAME).findOne({ uid: 'uid-signin' })
+      ).resolves.toMatchObject({ consumed: false })
+      await expect(
+        db.collection(OTP_LOCKOUTS_COLLECTION_NAME).findOne({
+          target: 'citizen@example.com'
+        })
+      ).resolves.toMatchObject({ requests: 1 })
+      await expect(verify('uid-signin', code)).resolves.toMatchObject({
+        status: 'signed-in'
+      })
+    })
+  })
+
   describe('completing a signup', () => {
     it('leaves nothing behind when a write fails after the others succeeded', async () => {
       const code = await requestCode('uid-rollback')
