@@ -3,9 +3,9 @@
 Automated tests and developers sign in with a test email address. forms-identity-api keeps the security code for a test address, and a test reads the code from an API route. No email is sent.
 
 > [!IMPORTANT]
-> This is for tests only. It works only for addresses on the test email domain `example.forms.defra.gov.uk`. The domain is a constant in the code (`TEST_EMAIL_DOMAIN` in [src/constants.js](../src/constants.js)), not a setting, so a change to the domain needs a code change and a review.
+> This is for tests only. It works only for addresses on the test email domain `example.forms.defra.gov.uk`.
 >
-> The code for every other address goes to the person by email or SMS. The service keeps only an argon2 hash of that code, so the test route cannot read it. A real account cannot sign in through this route.
+> Non-test OTPs go through a secure hashing and delivery process and do not use this test approach.
 
 ## How it works
 
