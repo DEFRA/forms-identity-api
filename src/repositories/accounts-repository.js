@@ -27,10 +27,7 @@ function coll() {
  * @param {ClientSession} [session]
  */
 export function findByEmail(email, session) {
-  return coll().findOne(
-    { email, status: { $ne: 'deleted' } },
-    session ? { session } : undefined
-  )
+  return coll().findOne({ email, status: { $ne: 'deleted' } }, { session })
 }
 
 /**
@@ -38,10 +35,7 @@ export function findByEmail(email, session) {
  * @param {ClientSession} [session]
  */
 export function findById(id, session) {
-  return coll().findOne(
-    { _id: id, status: { $ne: 'deleted' } },
-    session ? { session } : undefined
-  )
+  return coll().findOne({ _id: id, status: { $ne: 'deleted' } }, { session })
 }
 
 /**
@@ -51,7 +45,7 @@ export function findById(id, session) {
  * @param {ClientSession} [session]
  */
 export async function insert(account, session) {
-  await coll().insertOne(account, session ? { session } : undefined)
+  await coll().insertOne(account, { session })
   return account
 }
 
@@ -63,13 +57,9 @@ export async function insert(account, session) {
  * @param {ClientSession} [session]
  */
 export async function update(id, fields, session) {
-  return coll().updateOne(
-    { _id: id },
-    { $set: fields },
-    session ? { session } : undefined
-  )
+  return coll().updateOne({ _id: id }, { $set: fields }, { session })
 }
 
 /**
- * @import { Collection, ClientSession, UpdateResult } from 'mongodb'
+ * @import { Collection, ClientSession } from 'mongodb'
  */

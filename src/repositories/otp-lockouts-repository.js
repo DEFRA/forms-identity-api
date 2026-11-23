@@ -18,7 +18,7 @@ export { isDuplicateKeyError } from '~/src/mongo.js'
  * @param {ClientSession} [session]
  */
 export function findOne(filter, session) {
-  return coll().findOne(filter, session ? { session } : undefined)
+  return coll().findOne(filter, { session })
 }
 
 /**
@@ -34,7 +34,7 @@ export async function update(filter, fields, session) {
   const { matchedCount } = await coll().updateOne(
     filter,
     { $set: fields },
-    session ? { session } : undefined
+    { session }
   )
   return matchedCount > 0
 }
@@ -46,7 +46,7 @@ export async function update(filter, fields, session) {
  * @param {ClientSession} [session]
  */
 export async function clear(filter, session) {
-  await coll().deleteOne(filter, session ? { session } : undefined)
+  await coll().deleteOne(filter, { session })
 }
 
 /**
