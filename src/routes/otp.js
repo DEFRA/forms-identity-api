@@ -1,7 +1,7 @@
 import Boom from '@hapi/boom'
 import Joi from 'joi'
 
-import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { EN_GB, PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
 const transportSchema = Joi.string()
@@ -46,13 +46,15 @@ export default /** @type {ServerRoute[]} */ ([
             is: TRANSPORT.EMAIL,
             then: Joi.string().email().required(),
             otherwise: Joi.forbidden()
-          })
+          }),
+          serviceName: Joi.string().optional(),
+          language: Joi.string().optional()
         })
       }
     },
     handler(request) {
-      const { uid, transport, purpose, accountId, target } =
-        /** @type {{ uid: string, transport: TransportType, purpose: PurposeType, accountId?: string, target: string }} */ (
+      const { uid, transport, purpose, accountId, target, serviceName, language = EN_GB } =
+        /** @type {{ uid: string, transport: TransportType, purpose: PurposeType, accountId?: string, target: string, serviceName?: string, language: string }} */ (
           request.payload
         )
       // Further guards (in addition to Joi schema)
@@ -62,7 +64,7 @@ export default /** @type {ServerRoute[]} */ ([
       if (transportMustBeSms.has(purpose) && transport !== TRANSPORT.SMS) {
         throw Boom.badRequest()
       }
-      return requestOtp(uid, target, transport, purpose, accountId)
+      return requestOtp(uid, target, transport, purpose, { serviceName, language}, accountId)
     }
   },
   {

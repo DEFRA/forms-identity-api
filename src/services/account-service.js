@@ -157,7 +157,7 @@ export async function updatePhone(uid, id, phone) {
   // Clear any previous OTP requests from the same email
   await clearRequestCount(otpEmail.target)
 
-  auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
+  await auditPhoneChanged(account._id, account.email, oldPhone, newPhone)
 
   return { status: STATUS.VALID }
 }

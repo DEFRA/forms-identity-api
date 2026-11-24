@@ -24,8 +24,9 @@ export const OIDC_COLLECTION_NAMES = [
   'refresh_token',
   // one row per client assertion id, so a captured assertion cannot be
   // replayed within its lifetime — required by private_key_jwt client auth
-  'replay_detection'
-]
+  'replay_detection',
+// one row per pushed authorization request, read back once via request_uri
+  'pushed_authorization_request']
 
 /**
  * Revoking a grant must delete every artifact issued under it, across all of

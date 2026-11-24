@@ -3,7 +3,7 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
-import { PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
+import { EN_GB, PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
 import {
   auditOtpIssued,
   auditOtpLockout,
@@ -89,6 +89,7 @@ async function getAccountWithGuard(accountId) {
  * @param { string | undefined } email - not used if sending by SMS
  * @param {typeof TRANSPORT[keyof typeof TRANSPORT]} transportType
  * @param {PurposeType} purpose
+ * @param {{ serviceName?: string, language: string }} options - additional options
  * @param {string} [accountId] - id of account if email address not passed in
  */
 export async function requestOtp(
@@ -96,10 +97,12 @@ export async function requestOtp(
   email,
   transportType,
   purpose,
+  options,
   accountId
 ) {
   let target = email?.toLowerCase()
   let accountEmail = ''
+  const { serviceName, language } = options
 
   if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
@@ -153,11 +156,11 @@ export async function requestOtp(
       // A test address has no mailbox
       await keepTestOtp(target, purpose, code, expireAt)
     } else {
-      await sendOtpEmail(target, code)
+      await sendOtpEmail(target, code, language, serviceName)
     }
     auditOtpIssued(uid, target)
   } else {
-    await sendOtpSms(target, code)
+    await sendOtpSms(target, code, language, serviceName)
     auditOtpIssued(uid, accountEmail, target)
   }
 
@@ -269,13 +272,23 @@ export function clearRequestCount(target) {
  *   ((code))           -> the 6-digit one-time code
  *   ((expiry_minutes)) -> derived from otp.ttlSeconds so the email can never
  *                         drift from the configured TTL
+ * and may contain:
+ *   ((service_name))      -> the name of the service the sign in is for, or empty
+ *   ((has_service_name))  -> 'yes' or 'no', for a conditional line such as
+ *                         ((has_service_name??You're signing in to ((service_name)).))
+ * Both form keys are always sent, so a template that uses them never fails
+ * for a sign in that names no form.
  * @param {string} email
  * @param {string} code
+ * @param {string} language - the language preference for the OTP message
+ * @param {string} [serviceName] - optional service name for the OTP message
  */
-function sendOtpEmail(email, code) {
+function sendOtpEmail(email, code, language, serviceName) {
   return sendEmail(OTP_NOTIFY_TEMPLATE_ID, email, {
     code,
-    expiry_minutes: OTP_EXPIRY_MINUTES
+    expiry_minutes: OTP_EXPIRY_MINUTES,
+    service_name: serviceName ?? '',
+    has_service_name: serviceName ? 'yes' : 'no'
   })
 }
 
@@ -286,11 +299,15 @@ function sendOtpEmail(email, code) {
  *                         drift from the configured TTL
  * @param {string} phoneNumber
  * @param {string} code
+ * @param {string} language - the language preference for the OTP message
+ * @param {string} [serviceName] - optional service name for the OTP message
  */
-function sendOtpSms(phoneNumber, code) {
+function sendOtpSms(phoneNumber, code, language, serviceName) {
   return sendSms(OTP_NOTIFY_SMS_TEMPLATE_ID, phoneNumber, {
     code,
-    expiry_minutes: OTP_EXPIRY_MINUTES
+    expiry_minutes: OTP_EXPIRY_MINUTES,
+    service_name: serviceName ?? '',
+    has_service_name: serviceName ? 'yes' : 'no'
   })
 }
 

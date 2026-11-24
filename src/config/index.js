@@ -187,7 +187,7 @@ export const config = convict({
       },
       /** @type {SchemaObj<string>} */
       templateId: {
-        doc: 'GOV.UK Notify template id for the security-code email (must contain ((code)) and ((expiry_minutes)))',
+        doc: 'GOV.UK Notify template id for the security-code email (must contain ((code)) and ((expiry_minutes)), and may contain ((service_name)) and ((has_service_name)))',
         format: String,
         default: /** @type {string | null} */ (null),
         env: 'NOTIFY_OTP_TEMPLATE_ID'
@@ -241,6 +241,13 @@ export const config = convict({
         : 'arn:aws:iam::000000000000:role/forms-identity-ui',
       env: 'SERVICE_AUTH_ALLOWED_SUBJECT'
     }
+  },
+  /** @type {SchemaObj<string>} */
+  managerUrl: {
+    doc: 'forms-manager base URL. The security code email for a sign in names the form, and its title comes from here. When empty, the email names no form.',
+    format: String,
+    default: '',
+    env: 'MANAGER_URL'
   },
   /** @type {SchemaObj<string>} */
   httpProxy: {
