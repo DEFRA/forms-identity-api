@@ -236,13 +236,13 @@ describe('signin service', () => {
       )
 
       expect(sendEmail).toHaveBeenCalledWith(
-        process.env.NOTIFY_OTP_TEMPLATE_ID,
+        process.env.NOTIFY_OTP_ENGLISH_TEMPLATE_ID,
         'a@b.com',
         {
           code: expect.stringMatching(/^\d{6}$/),
           expiry_minutes: 15,
-          service_name: '',
-          has_service_name: 'no'
+          service_phrase: '',
+          action: 'sign in'
         }
       )
       const code = lastSentCode()

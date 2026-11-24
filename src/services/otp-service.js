@@ -3,7 +3,8 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
-import { PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
+import { CY, PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
+import { getActionContextForPurpose } from '~/src/helpers/language-helper.js'
 import {
   auditOtpIssued,
   auditOtpLockout,
@@ -23,8 +24,16 @@ import { isTestAddress, keepTestOtp } from '~/src/services/test-otp-service.js'
 const OTP_TTL_SECONDS = config.get('otp.ttlSeconds')
 const OTP_MAX_ATTEMPTS = config.get('otp.maxAttempts')
 const OTP_EXPIRY_MINUTES = Math.round(OTP_TTL_SECONDS / 60)
-const OTP_NOTIFY_TEMPLATE_ID = config.get('otp.notify.templateId')
-const OTP_NOTIFY_SMS_TEMPLATE_ID = config.get('otp.notify.smsTemplateId')
+const OTP_NOTIFY_ENGLISH_TEMPLATE_ID = config.get(
+  'otp.notify.englishTemplateId'
+)
+const OTP_NOTIFY_WELSH_TEMPLATE_ID = config.get('otp.notify.welshTemplateId')
+const OTP_NOTIFY_SMS_ENGLISH_TEMPLATE_ID = config.get(
+  'otp.notify.smsEnglishTemplateId'
+)
+const OTP_NOTIFY_SMS_WELSH_TEMPLATE_ID = config.get(
+  'otp.notify.smsWelshTemplateId'
+)
 const LOCKOUT_MAX_REQUESTS = config.get('otp.lockout.maxRequests')
 const LOCKOUT_WINDOW_MS = config.get('otp.lockout.windowSeconds') * 1000
 const LOCKOUT_MS = config.get('otp.lockout.durationSeconds') * 1000
@@ -156,11 +165,11 @@ export async function requestOtp(uid, email, transportType, purpose, options) {
       // A test address has no mailbox
       await keepTestOtp(target, purpose, code, expireAt)
     } else {
-      await sendOtpEmail(target, code, language, serviceName)
+      await sendOtpEmail(target, code, purpose, language, serviceName)
     }
     auditOtpIssued(uid, target)
   } else {
-    await sendOtpSms(target, code, language, serviceName)
+    await sendOtpSms(target, code, purpose, language, serviceName)
     auditOtpIssued(uid, accountEmail, target)
   }
 
@@ -273,6 +282,7 @@ export function clearRequestCount(target) {
  *   ((code))           -> the 6-digit one-time code
  *   ((expiry_minutes)) -> derived from otp.ttlSeconds so the email can never
  *                         drift from the configured TTL
+ *   ((action))           -> the action the OTP is for (already translated into the target language)
  * and may contain:
  *   ((service_name))      -> the name of the service the sign in is for, or empty
  *   ((has_service_name))  -> 'yes' or 'no', for a conditional line such as
@@ -281,15 +291,22 @@ export function clearRequestCount(target) {
  * for a sign in that names no form.
  * @param {string} email
  * @param {string} code
+ * @param {PurposeType} purpose - the purpose the OTP is for
  * @param {string} language - the language preference for the OTP message
  * @param {string} [serviceName] - optional service name for the OTP message
  */
-function sendOtpEmail(email, code, language, serviceName) {
-  return sendEmail(OTP_NOTIFY_TEMPLATE_ID, email, {
+function sendOtpEmail(email, code, purpose, language, serviceName) {
+  const templateId =
+    language === CY
+      ? OTP_NOTIFY_WELSH_TEMPLATE_ID
+      : OTP_NOTIFY_ENGLISH_TEMPLATE_ID
+
+  const { action, forText } = getActionContextForPurpose(purpose, language)
+  return sendEmail(templateId, email, {
     code,
     expiry_minutes: OTP_EXPIRY_MINUTES,
-    service_name: serviceName ?? '',
-    has_service_name: serviceName ? 'yes' : 'no'
+    service_phrase: serviceName ? `${forText} '${serviceName}'` : '',
+    action
   })
 }
 
@@ -300,15 +317,22 @@ function sendOtpEmail(email, code, language, serviceName) {
  *                         drift from the configured TTL
  * @param {string} phoneNumber
  * @param {string} code
+ * @param {PurposeType} purpose - the action the OTP is for
  * @param {string} language - the language preference for the OTP message
  * @param {string} [serviceName] - optional service name for the OTP message
  */
-function sendOtpSms(phoneNumber, code, language, serviceName) {
-  return sendSms(OTP_NOTIFY_SMS_TEMPLATE_ID, phoneNumber, {
+function sendOtpSms(phoneNumber, code, purpose, language, serviceName) {
+  const templateId =
+    language === CY
+      ? OTP_NOTIFY_SMS_WELSH_TEMPLATE_ID
+      : OTP_NOTIFY_SMS_ENGLISH_TEMPLATE_ID
+
+  const { action, forText } = getActionContextForPurpose(purpose, language)
+  return sendSms(templateId, phoneNumber, {
     code,
     expiry_minutes: OTP_EXPIRY_MINUTES,
-    service_name: serviceName ?? '',
-    has_service_name: serviceName ? 'yes' : 'no'
+    service_phrase: serviceName ? `${forText} '${serviceName}'` : '',
+    action
   })
 }
 

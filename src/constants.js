@@ -58,3 +58,4 @@ export const STATUS = {
 export const TEST_EMAIL_DOMAIN = 'example.forms.defra.gov.uk'
 
 export const EN_GB = 'en-GB'
+export const CY = 'cy'
