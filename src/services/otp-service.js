@@ -102,7 +102,7 @@ async function getAccountWithGuard(accountId) {
 export async function requestOtp(uid, email, transportType, purpose, options) {
   let target = email?.toLowerCase()
   let accountEmail = ''
-  const { accountId } = options
+  const { serviceName, language, accountId } = options
 
   if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
@@ -156,11 +156,11 @@ export async function requestOtp(uid, email, transportType, purpose, options) {
       // A test address has no mailbox
       await keepTestOtp(target, purpose, code, expireAt)
     } else {
-      await sendOtpEmail(target, code, options.language, options.serviceName)
+      await sendOtpEmail(target, code, language, serviceName)
     }
     auditOtpIssued(uid, target)
   } else {
-    await sendOtpSms(target, code, options.language, options.serviceName)
+    await sendOtpSms(target, code, language, serviceName)
     auditOtpIssued(uid, accountEmail, target)
   }
 
