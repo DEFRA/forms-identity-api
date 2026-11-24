@@ -6,7 +6,7 @@ import {
 import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
-import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { EN_GB, PURPOSE, TRANSPORT } from '~/src/constants.js'
 import {
   auditOtpIssued,
   auditOtpLockout,
@@ -51,6 +51,7 @@ jest.mock('~/src/lib/audit.js', () => ({
   auditSignIn: jest.fn(),
   auditRegistration: jest.fn()
 }))
+jest.mock('~/src/messaging/publish-base.js')
 
 /** Codes an address may request in a window before it is locked out */
 const MAX_REQUESTS = 5
@@ -215,7 +216,9 @@ function lastSentCode() {
  * @param {string} uid
  */
 async function request(uid, email = 'a@b.com') {
-  await requestOtp(uid, email, TRANSPORT.EMAIL, PURPOSE.SIGNIN_VERIFY_EMAIL)
+  await requestOtp(uid, email, TRANSPORT.EMAIL, PURPOSE.SIGNIN_VERIFY_EMAIL, {
+    language: EN_GB
+  })
   return lastSentCode()
 }
 
@@ -228,13 +231,19 @@ describe('signin service', () => {
         'uid-1',
         'A@B.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(sendEmail).toHaveBeenCalledWith(
         process.env.NOTIFY_OTP_TEMPLATE_ID,
         'a@b.com',
-        { code: expect.stringMatching(/^\d{6}$/), expiry_minutes: 15 }
+        {
+          code: expect.stringMatching(/^\d{6}$/),
+          expiry_minutes: 15,
+          service_name: '',
+          has_service_name: 'no'
+        }
       )
       const code = lastSentCode()
       const doc = docs[0]
@@ -255,7 +264,8 @@ describe('signin service', () => {
         'uid-1',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(storedOtps[0].codeHash).toMatch(
@@ -278,7 +288,8 @@ describe('signin service', () => {
             'uid-1',
             'a@b.com',
             TRANSPORT.EMAIL,
-            PURPOSE.SIGNIN_VERIFY_EMAIL
+            PURPOSE.SIGNIN_VERIFY_EMAIL,
+            { language: EN_GB }
           )
           const code = lastSentCode()
           expect(code).toMatch(/^\d{6}$/)
@@ -298,7 +309,8 @@ describe('signin service', () => {
         'uid-1',
         'A@B.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(auditOtpIssued).toHaveBeenCalledWith('uid-1', 'a@b.com')
@@ -311,13 +323,15 @@ describe('signin service', () => {
         'uid-1',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
       await requestOtp(
         'uid-1',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(auditOtpIssued).toHaveBeenCalledTimes(2)
@@ -334,7 +348,8 @@ describe('signin service', () => {
           'uid-1',
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).rejects.toThrow('Notify is down')
       expect(auditOtpIssued).not.toHaveBeenCalled()
@@ -351,7 +366,8 @@ describe('signin service', () => {
             `uid-${i}`,
             'a@b.com',
             TRANSPORT.EMAIL,
-            PURPOSE.SIGNIN_VERIFY_EMAIL
+            PURPOSE.SIGNIN_VERIFY_EMAIL,
+            { language: EN_GB }
           )
         ).resolves.toEqual({
           status: 'otp-issued'
@@ -369,7 +385,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
       jest.mocked(sendEmail).mockClear()
@@ -378,7 +395,8 @@ describe('signin service', () => {
         'uid-over',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(result).toEqual({
@@ -401,14 +419,16 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
       await requestOtp(
         'uid-again',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       const lockedUntil = counters[0].lockedUntil.getTime()
@@ -417,6 +437,7 @@ describe('signin service', () => {
       expect(auditOtpLockout).toHaveBeenCalledTimes(1)
       expect(auditOtpLockout).toHaveBeenCalledWith(
         'uid-5',
+        'SIGNIN_VERIFY_EMAIL',
         'a@b.com',
         new Date(lockedUntil)
       )
@@ -429,7 +450,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
       const lockedUntil = counters[0].lockedUntil
@@ -438,7 +460,8 @@ describe('signin service', () => {
         'uid-later',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(result).toEqual({
@@ -461,7 +484,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'A@B.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
 
@@ -478,7 +502,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
 
@@ -487,7 +512,8 @@ describe('signin service', () => {
           'uid-other',
           'c@d.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).resolves.toEqual({
         status: 'otp-issued'
@@ -501,7 +527,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
 
@@ -512,7 +539,8 @@ describe('signin service', () => {
           'uid-after',
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).resolves.toEqual({
         status: 'otp-issued'
@@ -528,7 +556,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
 
@@ -539,7 +568,8 @@ describe('signin service', () => {
           'uid-after',
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).resolves.toEqual({
         status: 'otp-issued'
@@ -554,7 +584,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
 
@@ -565,7 +596,8 @@ describe('signin service', () => {
           'uid-over',
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).resolves.toEqual({
         status: 'locked-out',
@@ -599,7 +631,8 @@ describe('signin service', () => {
           'uid-next',
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).resolves.toEqual({
         status: 'otp-issued'
@@ -629,7 +662,8 @@ describe('signin service', () => {
           'uid-next',
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       ).resolves.toEqual({
         status: 'otp-issued'
@@ -669,7 +703,8 @@ describe('signin service', () => {
           `uid-${i}`,
           'a@b.com',
           TRANSPORT.EMAIL,
-          PURPOSE.SIGNIN_VERIFY_EMAIL
+          PURPOSE.SIGNIN_VERIFY_EMAIL,
+          { language: EN_GB }
         )
       }
       jest.mocked(otpLockoutsRepository.update).mockResolvedValue(false)
@@ -678,7 +713,8 @@ describe('signin service', () => {
         'uid-over',
         'a@b.com',
         TRANSPORT.EMAIL,
-        PURPOSE.SIGNIN_VERIFY_EMAIL
+        PURPOSE.SIGNIN_VERIFY_EMAIL,
+        { language: EN_GB }
       )
 
       expect(result.status).toBe('locked-out')

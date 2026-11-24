@@ -3,6 +3,7 @@ import { OTPS_COLLECTION_NAME, db } from '~/src/mongo.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))
+jest.mock('~/src/messaging/publish-base.js')
 
 const { inject, requestCode, verify } = setupSigninFlow()
 

@@ -2,7 +2,7 @@
 import { audit } from '@defra/cdp-auditing'
 import argon2 from 'argon2'
 
-import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { EN_GB, PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
 import {
@@ -40,7 +40,7 @@ describe('otp-service', () => {
           email,
           TRANSPORT.EMAIL,
           PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-          accountId
+          { language: EN_GB, accountId }
         )
       ).rejects.toThrow('Bad Request')
     })
@@ -54,7 +54,7 @@ describe('otp-service', () => {
           '',
           TRANSPORT.EMAIL,
           PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-          accountId
+          { language: EN_GB, accountId }
         )
       ).rejects.toThrow('Bad Request')
     })
@@ -72,12 +72,17 @@ describe('otp-service', () => {
         'test-email@test.com',
         TRANSPORT.EMAIL,
         PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-        'acc-id'
+        { language: EN_GB, accountId }
       )
       expect(sendEmail).toHaveBeenCalledWith(
         'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
         'test-email@test.com',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_name: '',
+          has_service_name: 'no'
+        }
       )
       expect(audit).toHaveBeenCalledWith({
         event: 'OtpIssued',
@@ -99,12 +104,17 @@ describe('otp-service', () => {
         '',
         TRANSPORT.SMS,
         PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
-        accountId
+        { language: EN_GB, accountId }
       )
       expect(sendSms).toHaveBeenCalledWith(
         'ssssssss-ssss-ssss-ssss-ssssssssssss',
         '+447507123456',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_name: '',
+          has_service_name: 'no'
+        }
       )
       expect(audit).toHaveBeenCalledWith({
         event: 'OtpIssued',

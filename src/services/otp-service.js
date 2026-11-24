@@ -3,13 +3,17 @@ import Boom from '@hapi/boom'
 import argon2 from 'argon2'
 
 import { config } from '~/src/config/index.js'
-import { EN_GB, PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
+import { PURPOSE, STATUS, TRANSPORT } from '~/src/constants.js'
 import {
   auditOtpIssued,
   auditOtpLockout,
   auditSignIn
 } from '~/src/lib/audit.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
+import {
+  publishIncorrectCodeEnteredEvent,
+  publishIncorrectCodeLockoutEvent
+} from '~/src/messaging/publish.js'
 import { codeSchema, generateCode } from '~/src/otp-code.js'
 import * as accountsRepository from '~/src/repositories/accounts-repository.js'
 import * as otpLockoutsRepository from '~/src/repositories/otp-lockouts-repository.js'
@@ -89,20 +93,16 @@ async function getAccountWithGuard(accountId) {
  * @param { string | undefined } email - not used if sending by SMS
  * @param {typeof TRANSPORT[keyof typeof TRANSPORT]} transportType
  * @param {PurposeType} purpose
- * @param {{ serviceName?: string, language: string }} options - additional options
- * @param {string} [accountId] - id of account if email address not passed in
+ * @param {{ serviceName?: string, language: string, accountId?: string }} options - additional options
+ * Options:
+ * serviceName - name of the service sending the OTP
+ * language - language for the OTP message
+ * accountId - id of account if email address not passed in
  */
-export async function requestOtp(
-  uid,
-  email,
-  transportType,
-  purpose,
-  options,
-  accountId
-) {
+export async function requestOtp(uid, email, transportType, purpose, options) {
   let target = email?.toLowerCase()
   let accountEmail = ''
-  const { serviceName, language } = options
+  const { accountId } = options
 
   if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // Verify account exists
@@ -125,7 +125,7 @@ export async function requestOtp(
     throw Boom.badRequest()
   }
 
-  const lockedUntil = await claimOtpRequest(uid, target)
+  const lockedUntil = await claimOtpRequest(uid, purpose, target)
 
   if (lockedUntil) {
     return {
@@ -156,11 +156,11 @@ export async function requestOtp(
       // A test address has no mailbox
       await keepTestOtp(target, purpose, code, expireAt)
     } else {
-      await sendOtpEmail(target, code, language, serviceName)
+      await sendOtpEmail(target, code, options.language, options.serviceName)
     }
     auditOtpIssued(uid, target)
   } else {
-    await sendOtpSms(target, code, language, serviceName)
+    await sendOtpSms(target, code, options.language, options.serviceName)
     auditOtpIssued(uid, accountEmail, target)
   }
 
@@ -174,10 +174,11 @@ export async function requestOtp(
  * The counter is keyed on the address alone, not on the interaction, so
  * starting a fresh interaction for every request does not buy a fresh count.
  * @param {string} uid
+ * @param {PurposeType} purpose - the purpose for which the OTP is requested
  * @param {string} target - lowercased email
  * @returns {Promise<Date | null>} when the lockout lifts, or null if not locked out
  */
-async function claimOtpRequest(uid, target) {
+async function claimOtpRequest(uid, purpose, target) {
   const now = new Date()
   const key = { target }
   const existing = await otpLockoutsRepository.findOne(key)
@@ -228,7 +229,7 @@ async function claimOtpRequest(uid, target) {
   )
 
   if (locked) {
-    auditOtpLockout(uid, target, lockedUntil)
+    await auditOtpLockout(uid, purpose, target, lockedUntil)
   }
 
   return lockedUntil
@@ -361,7 +362,13 @@ export async function verifyOtp(uid, code, purpose, id) {
   const failResult = { status: STATUS.INVALID }
 
   if (!ok) {
-    const consumed = await spendAttempt(claim)
+    const { consumed, target } = await spendAttempt(claim)
+
+    if (consumed) {
+      await publishIncorrectCodeLockoutEvent(uid, purpose, id, target)
+    } else {
+      await publishIncorrectCodeEnteredEvent(uid, purpose, id, target)
+    }
 
     return consumed ? consumedOrExpiredResult : failResult
   }
@@ -410,7 +417,7 @@ async function handleWhenAccountExists(
     }
 
     setUserId(account._id)
-    auditSignIn(account._id, account.email, uid)
+    await auditSignIn(account._id, account.email, uid)
     return { status: STATUS.SIGNED_IN, accountId: account._id }
   }
 
@@ -466,7 +473,7 @@ async function spendAttempt(claim) {
     consumed = await otpsRepository.update(claim, { consumed: true })
   }
 
-  return consumed
+  return { consumed, target: updated?.target }
 }
 
 /**

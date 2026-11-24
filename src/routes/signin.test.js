@@ -47,7 +47,7 @@ describe('signin routes', () => {
       'a@b.com',
       'EMAIL',
       'SIGNIN_VERIFY_EMAIL',
-      undefined
+      { serviceName: undefined, language: 'en-GB', accountId: undefined }
     )
   })
 

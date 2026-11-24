@@ -29,7 +29,12 @@ describe('OTP endpoints', () => {
       expect(sendEmail).toHaveBeenCalledWith(
         'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
         'a@b.com',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_name: '',
+          has_service_name: 'no'
+        }
       )
       expect(sendSms).not.toHaveBeenCalled()
     })
@@ -52,7 +57,12 @@ describe('OTP endpoints', () => {
       expect(sendSms).toHaveBeenCalledWith(
         'ssssssss-ssss-ssss-ssss-ssssssssssss',
         '+447507123456',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_name: '',
+          has_service_name: 'no'
+        }
       )
       expect(sendEmail).not.toHaveBeenCalled()
     })
