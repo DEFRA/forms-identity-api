@@ -257,13 +257,6 @@ export const config = convict({
     }
   },
   /** @type {SchemaObj<string>} */
-  managerUrl: {
-    doc: 'forms-manager base URL. The security code email for a sign in names the form, and its title comes from here. When empty, the email names no form.',
-    format: String,
-    default: '',
-    env: 'MANAGER_URL'
-  },
-  /** @type {SchemaObj<string>} */
   httpProxy: {
     doc: 'HTTP Proxy',
     format: String,
