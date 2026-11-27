@@ -17,8 +17,13 @@ export const SERVICE_NAME_MAX_LENGTH = 150
 // Anything that looks like a URL, script scheme or domain (e.g. "evil.com").
 // Notify escapes HTML in personalisation but auto-links URLs/domains, so these
 // are a phishing risk and are stripped out.
+// Applied to single words, so every alternative is fixed-length (no backtracking):
+//   "//"                 any scheme://, or protocol-relative //host
+//   "<scheme>:"          javascript:, mailto: etc. without slashes
+//   "www."
+//   "x.ab"               domain-like, e.g. evil.com, gov.uk
 const SERVICE_NAME_URL_LIKE =
-  /[a-z][a-z\d+.-]*:\/\/|\b(?:javascript|vbscript|data|mailto|tel|sms|https?|ftp)\s*:|www\.|[\p{L}\p{N}-]\.[a-z]{2,}(?![\p{L}\p{N}])/iu
+  /\/\/|\b(?:javascript|vbscript|data|mailto|tel|sms|https?|ftp):|www\.|[\p{L}\p{N}-]\.[a-z]{2}/iu
 
 const serviceNameSchema = Joi.string()
   .trim()
