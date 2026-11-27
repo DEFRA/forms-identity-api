@@ -50,8 +50,17 @@ describe('config', () => {
 
   it('should read Notify credentials from the environment', () => {
     expect(config.get('otp.notify.apiKey')).toBe(process.env.NOTIFY_API_KEY)
-    expect(config.get('otp.notify.templateId')).toBe(
-      process.env.NOTIFY_OTP_TEMPLATE_ID
+    expect(config.get('otp.notify.englishTemplateId')).toBe(
+      process.env.NOTIFY_OTP_ENGLISH_TEMPLATE_ID
+    )
+    expect(config.get('otp.notify.welshTemplateId')).toBe(
+      process.env.NOTIFY_OTP_WELSH_TEMPLATE_ID
+    )
+    expect(config.get('otp.notify.smsEnglishTemplateId')).toBe(
+      process.env.NOTIFY_OTP_SMS_ENGLISH_TEMPLATE_ID
+    )
+    expect(config.get('otp.notify.smsWelshTemplateId')).toBe(
+      process.env.NOTIFY_OTP_SMS_WELSH_TEMPLATE_ID
     )
   })
 })

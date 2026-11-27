@@ -186,11 +186,18 @@ export const config = convict({
         env: 'NOTIFY_API_KEY'
       },
       /** @type {SchemaObj<string>} */
-      templateId: {
-        doc: 'GOV.UK Notify template id for the security-code email (must contain ((code)) and ((expiry_minutes)))',
+      englishTemplateId: {
+        doc: 'GOV.UK Notify template id for the English security-code email (must contain ((code)) and ((expiry_minutes)) and ((action)), and may contain ((service_phrase)))',
         format: String,
         default: /** @type {string | null} */ (null),
-        env: 'NOTIFY_OTP_TEMPLATE_ID'
+        env: 'NOTIFY_OTP_ENGLISH_TEMPLATE_ID'
+      },
+      /** @type {SchemaObj<string>} */
+      welshTemplateId: {
+        doc: 'GOV.UK Notify template id for the Welsh security-code email (must contain ((code)) and ((expiry_minutes)) and ((action)), and may contain ((service_phrase)))',
+        format: String,
+        default: /** @type {string | null} */ (null),
+        env: 'NOTIFY_OTP_WELSH_TEMPLATE_ID'
       },
       /** @type {SchemaObj<string | null>} */
       replyToId: {
@@ -200,11 +207,18 @@ export const config = convict({
         env: 'NOTIFY_REPLY_TO_ID'
       },
       /** @type {SchemaObj<string>} */
-      smsTemplateId: {
-        doc: 'GOV.UK Notify SMS template id for the security-code text message (must contain ((code)) and ((expiry_minutes)))',
+      smsEnglishTemplateId: {
+        doc: 'GOV.UK Notify SMS template id for the security-code text message (must contain ((code)) and ((expiry_minutes)), and may contain ((service_phrase)))',
         format: String,
         default: /** @type {string | null} */ (null),
-        env: 'NOTIFY_OTP_SMS_TEMPLATE_ID'
+        env: 'NOTIFY_OTP_SMS_ENGLISH_TEMPLATE_ID'
+      },
+      /** @type {SchemaObj<string>} */
+      smsWelshTemplateId: {
+        doc: 'GOV.UK Notify SMS template id for the Welsh security-code text message (must contain ((code)) and ((expiry_minutes)), and may contain ((service_phrase)))',
+        format: String,
+        default: /** @type {string | null} */ (null),
+        env: 'NOTIFY_OTP_SMS_WELSH_TEMPLATE_ID'
       }
     }
   },

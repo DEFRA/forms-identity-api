@@ -27,9 +27,14 @@ describe('OTP endpoints', () => {
 
       expect(res.statusCode).toBe(200)
       expect(sendEmail).toHaveBeenCalledWith(
-        'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
+        process.env.NOTIFY_OTP_ENGLISH_TEMPLATE_ID,
         'a@b.com',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_phrase: '',
+          action: 'sign in'
+        }
       )
       expect(sendSms).not.toHaveBeenCalled()
     })
@@ -50,9 +55,14 @@ describe('OTP endpoints', () => {
 
       expect(res.statusCode).toBe(200)
       expect(sendSms).toHaveBeenCalledWith(
-        'ssssssss-ssss-ssss-ssss-ssssssssssss',
+        process.env.NOTIFY_OTP_SMS_ENGLISH_TEMPLATE_ID,
         '+447507123456',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_phrase: '',
+          action: 'change your email address'
+        }
       )
       expect(sendEmail).not.toHaveBeenCalled()
     })

@@ -1,7 +1,7 @@
 import Boom from '@hapi/boom'
 import Joi from 'joi'
 
-import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { EN_GB, PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { getTransportType } from '~/src/routes/otp-helper.js'
 import { findOtp, requestOtp, verifyOtp } from '~/src/services/otp-service.js'
 
@@ -11,6 +11,39 @@ const transportSchema = Joi.string()
 const purposeSchema = Joi.string()
   .valid(...Object.keys(PURPOSE))
   .default(PURPOSE.SIGNIN_VERIFY_EMAIL)
+
+export const SERVICE_NAME_MAX_LENGTH = 150
+
+// Anything that looks like a URL, script scheme or domain (e.g. "evil.com").
+// Notify escapes HTML in personalisation but auto-links URLs/domains, so these
+// are a phishing risk and are stripped out.
+// Applied to single words, so every alternative is fixed-length (no backtracking):
+//   "//"                 any scheme://, or protocol-relative //host
+//   "<scheme>:"          javascript:, mailto: etc. without slashes
+//   "www."
+//   "x.ab"               domain-like, e.g. evil.com, gov.uk
+const SERVICE_NAME_URL_LIKE =
+  /\/\/|\b(?:javascript|vbscript|data|mailto|tel|sms|https?|ftp):|www\.|[\p{L}\p{N}-]\.[a-z]{2}/iu
+
+const serviceNameSchema = Joi.string()
+  .trim()
+  .allow('')
+  .custom(sanitiseServiceName)
+
+/**
+ * Truncates the service name to the max length, then removes any
+ * whitespace-separated word that looks like a URL or domain.
+ * Truncation happens first so it can't turn a safe word into a domain-like one.
+ * @param {string} value - the service name
+ */
+export function sanitiseServiceName(value) {
+  return value
+    .slice(0, SERVICE_NAME_MAX_LENGTH)
+    .split(/\s+/)
+    .filter((word) => !SERVICE_NAME_URL_LIKE.test(word))
+    .join(' ')
+    .trim()
+}
 
 /**
  * Domain routes for OTP operations, consumed only by forms-identity-ui over the
@@ -36,15 +69,24 @@ export default /** @type {ServerRoute[]} */ ([
             is: TRANSPORT.EMAIL,
             then: Joi.string().email().required(),
             otherwise: Joi.forbidden()
-          })
+          }),
+          serviceName: serviceNameSchema.optional(),
+          language: Joi.string().optional()
         })
       }
     },
     handler(request) {
-      const { uid, transport, purpose, accountId, target } =
-        /** @type {{ uid: string, transport: TransportType, purpose: PurposeType, accountId?: string, target: string }} */ (
-          request.payload
-        )
+      const {
+        uid,
+        transport,
+        purpose,
+        accountId,
+        target,
+        serviceName,
+        language = EN_GB
+      } = /** @type {{ uid: string, transport: TransportType, purpose: PurposeType, accountId?: string, target: string, serviceName?: string, language: string }} */ (
+        request.payload
+      )
       // Further guards (in addition to Joi schema)
       if (
         getTransportType(purpose) === TRANSPORT.EMAIL &&
@@ -58,7 +100,11 @@ export default /** @type {ServerRoute[]} */ ([
       ) {
         throw Boom.badRequest()
       }
-      return requestOtp(uid, target, transport, purpose, accountId)
+      return requestOtp(uid, target, transport, purpose, {
+        serviceName,
+        language,
+        accountId
+      })
     }
   },
   {

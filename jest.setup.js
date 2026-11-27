@@ -20,8 +20,14 @@ process.env.HTTP_PROXY = ''
 // uuids differ so tests can tell the service id (first) from the key id (last)
 process.env.NOTIFY_API_KEY =
   'test_key-zzzzzzzz-zzzz-zzzz-zzzz-servicezzzzz-zzzzzzzz-zzzz-zzzz-zzzz-apikeyzzzzzz'
-process.env.NOTIFY_OTP_TEMPLATE_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz'
-process.env.NOTIFY_OTP_SMS_TEMPLATE_ID = 'ssssssss-ssss-ssss-ssss-ssssssssssss'
+process.env.NOTIFY_OTP_ENGLISH_TEMPLATE_ID =
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'
+process.env.NOTIFY_OTP_WELSH_TEMPLATE_ID =
+  'wwwwwwww-wwww-wwww-wwww-wwwwwwwwwwww'
+process.env.NOTIFY_OTP_SMS_ENGLISH_TEMPLATE_ID =
+  'texteeee-eeee-eeee-eeee-eeeeeeeeeeee'
+process.env.NOTIFY_OTP_SMS_WELSH_TEMPLATE_ID =
+  'textwwww-wwww-wwww-wwww-wwwwwwwwwwww'
 process.env.NOTIFY_REPLY_TO_ID = 'zzzzzzzz-zzzz-zzzz-zzzz-replytozzzzz'
 process.env.TRACING_HEADER = 'x-cdp-request-id'
 

@@ -2,7 +2,7 @@
 import { audit } from '@defra/cdp-auditing'
 import argon2 from 'argon2'
 
-import { PURPOSE, TRANSPORT } from '~/src/constants.js'
+import { CY, EN_GB, PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
 import { client } from '~/src/mongo.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
@@ -52,7 +52,7 @@ describe('otp-service', () => {
           email,
           TRANSPORT.EMAIL,
           PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-          accountId
+          { language: EN_GB, accountId }
         )
       ).rejects.toThrow('Bad Request')
     })
@@ -66,7 +66,7 @@ describe('otp-service', () => {
           '',
           TRANSPORT.EMAIL,
           PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-          accountId
+          { language: EN_GB, accountId }
         )
       ).rejects.toThrow('Bad Request')
     })
@@ -84,12 +84,17 @@ describe('otp-service', () => {
         'test-email@test.com',
         TRANSPORT.EMAIL,
         PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
-        'acc-id'
+        { language: EN_GB, accountId }
       )
       expect(sendEmail).toHaveBeenCalledWith(
-        'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz',
+        process.env.NOTIFY_OTP_ENGLISH_TEMPLATE_ID,
         'test-email@test.com',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_phrase: '',
+          action: 'confirm your new email address'
+        }
       )
       expect(audit).toHaveBeenCalledWith({
         event: 'OtpIssued',
@@ -111,18 +116,125 @@ describe('otp-service', () => {
         '',
         TRANSPORT.SMS,
         PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
-        accountId
+        { language: EN_GB, accountId }
       )
       expect(sendSms).toHaveBeenCalledWith(
-        'ssssssss-ssss-ssss-ssss-ssssssssssss',
+        process.env.NOTIFY_OTP_SMS_ENGLISH_TEMPLATE_ID,
         '+447507123456',
-        { code: expect.any(String), expiry_minutes: 15 }
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_phrase: '',
+          action: 'change your email address'
+        }
       )
       expect(audit).toHaveBeenCalledWith({
         event: 'OtpIssued',
         email: 'test-email@test.com',
         phone: '+447507123456',
         uid: 'uid-1'
+      })
+    })
+
+    it('should send the English email with the service phrase when a service is named', async () => {
+      jest
+        .mocked(findById)
+        // @ts-expect-error - partial mock of test data
+        .mockResolvedValueOnce({ email: 'test-email@test.com' })
+      await requestOtp(
+        uid,
+        'test-email@test.com',
+        TRANSPORT.EMAIL,
+        PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
+        { language: EN_GB, accountId, serviceName: 'Apply for a licence' }
+      )
+      expect(sendEmail).toHaveBeenCalledWith(
+        process.env.NOTIFY_OTP_ENGLISH_TEMPLATE_ID,
+        'test-email@test.com',
+        {
+          code: expect.any(String),
+          expiry_minutes: 15,
+          service_phrase: "for 'Apply for a licence'",
+          action: 'confirm your new email address'
+        }
+      )
+    })
+
+    describe('in Welsh', () => {
+      it('should send the Welsh email template with Welsh text', async () => {
+        jest
+          .mocked(findById)
+          // @ts-expect-error - partial mock of test data
+          .mockResolvedValueOnce({ email: 'test-email@test.com' })
+        await requestOtp(
+          uid,
+          'test-email@test.com',
+          TRANSPORT.EMAIL,
+          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL,
+          { language: CY, accountId }
+        )
+        expect(sendEmail).toHaveBeenCalledWith(
+          process.env.NOTIFY_OTP_WELSH_TEMPLATE_ID,
+          'test-email@test.com',
+          {
+            code: expect.any(String),
+            expiry_minutes: 15,
+            service_phrase: '',
+            action: 'cadarnhau eich cyfeiriad e-bost newydd'
+          }
+        )
+      })
+
+      it('should send the Welsh email with a Welsh service phrase when a service is named', async () => {
+        jest
+          .mocked(findById)
+          // @ts-expect-error - partial mock of test data
+          .mockResolvedValueOnce({ email: 'test-email@test.com' })
+        await requestOtp(
+          uid,
+          'test-email@test.com',
+          TRANSPORT.EMAIL,
+          PURPOSE.ACCOUNT_DELETE_ACCOUNT_VERIFY_EMAIL,
+          { language: CY, accountId, serviceName: 'Gwneud cais am drwydded' }
+        )
+        expect(sendEmail).toHaveBeenCalledWith(
+          process.env.NOTIFY_OTP_WELSH_TEMPLATE_ID,
+          'test-email@test.com',
+          {
+            code: expect.any(String),
+            expiry_minutes: 15,
+            service_phrase: "ar gyfer 'Gwneud cais am drwydded'",
+            action: 'dileu eich manylion mewngofnodi'
+          }
+        )
+      })
+
+      it('should send the Welsh SMS template with Welsh text', async () => {
+        jest
+          .mocked(findById)
+          // @ts-expect-error - partial mock of test data
+          .mockResolvedValueOnce({
+            phone: '+447507123456',
+            email: 'test-email@test.com'
+          })
+        await requestOtp(
+          uid,
+          '',
+          TRANSPORT.SMS,
+          PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE,
+          { language: CY, accountId }
+        )
+        expect(sendSms).toHaveBeenCalledWith(
+          process.env.NOTIFY_OTP_SMS_WELSH_TEMPLATE_ID,
+          '+447507123456',
+          {
+            code: expect.any(String),
+            expiry_minutes: 15,
+            service_phrase: '',
+            action: 'newid eich cyfeiriad e-bost'
+          }
+        )
+        expect(sendEmail).not.toHaveBeenCalled()
       })
     })
   })
