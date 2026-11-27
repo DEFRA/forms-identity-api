@@ -11,6 +11,7 @@ import {
   auditSignIn
 } from '~/src/lib/audit.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
+import { runInTransaction } from '~/src/lib/transaction.js'
 import {
   publishIncorrectCodeEnteredEvent,
   publishIncorrectCodeLockoutEvent
@@ -188,9 +189,32 @@ export async function requestOtp(uid, email, transportType, purpose, options) {
  * @returns {Promise<Date | null>} when the lockout lifts, or null if not locked out
  */
 async function claimOtpRequest(uid, purpose, target) {
+  const attempt = () =>
+    runInTransaction((session) =>
+      claimOtpRequestInTransaction(uid, purpose, target, session)
+    )
+
+  try {
+    return await attempt()
+  } catch (err) {
+    // Concurrent first requests can race to insert the unique target.
+    if (!otpLockoutsRepository.isDuplicateKeyError(err)) {
+      throw err
+    }
+    return attempt()
+  }
+}
+
+/**
+ * @param {string} uid
+ * @param {PurposeType} purpose
+ * @param {string} target
+ * @param {ClientSession} session
+ */
+async function claimOtpRequestInTransaction(uid, purpose, target, session) {
   const now = new Date()
   const key = { target }
-  const existing = await otpLockoutsRepository.findOne(key)
+  const existing = await otpLockoutsRepository.findOne(key, session)
 
   // The address is locked. Refuse the request and leave the record as it
   // is, so that requests during a lockout keep the same unlock time
@@ -208,7 +232,8 @@ async function claimOtpRequest(uid, purpose, target) {
     // match nothing and their counts are added to the new window.
     await otpLockoutsRepository.update(
       { ...key, windowStartedAt: existing.windowStartedAt },
-      { windowStartedAt: now, requests: 0, lockedUntil: null }
+      { windowStartedAt: now, requests: 0, lockedUntil: null },
+      session
     )
   }
 
@@ -218,7 +243,8 @@ async function claimOtpRequest(uid, purpose, target) {
   const counter = await otpLockoutsRepository.incrementRequests(
     key,
     { expireAt: new Date(now.getTime() + LOCKOUT_WINDOW_MS + LOCKOUT_MS) },
-    { windowStartedAt: now, lockedUntil: null }
+    { windowStartedAt: now, lockedUntil: null },
+    session
   )
 
   if (counter.requests <= LOCKOUT_MAX_REQUESTS) {
@@ -234,7 +260,8 @@ async function claimOtpRequest(uid, purpose, target) {
 
   const locked = await otpLockoutsRepository.update(
     { ...key, lockedUntil: null },
-    { lockedUntil }
+    { lockedUntil },
+    session
   )
 
   if (locked) {
@@ -272,9 +299,10 @@ function hasWindowElapsed(counter, now) {
  * address, so the count they ran up getting in should not follow them into
  * their next sign-in.
  * @param {string} target - lowercased email
+ * @param {ClientSession} [session]
  */
-export function clearRequestCount(target) {
-  return otpLockoutsRepository.clear({ target })
+export function clearRequestCount(target, session) {
+  return otpLockoutsRepository.clear({ target }, session)
 }
 
 /**
@@ -354,6 +382,20 @@ export async function verifyOtp(uid, code, purpose, id) {
     return { status: STATUS.INVALID_CODE_FORMAT }
   }
 
+  return runInTransaction((session) =>
+    verifyOtpInTransaction(uid, code, purpose, id, session)
+  )
+}
+
+/**
+ * @param {string} uid
+ * @param {string} code
+ * @param {PurposeType} purpose
+ * @param {string | undefined} id
+ * @param {ClientSession} session
+ * @returns {Promise<VerifyResult>}
+ */
+async function verifyOtpInTransaction(uid, code, purpose, id, session) {
   /** @type {{ uid: string, purpose: PurposeType, verified: boolean, consumed: boolean, accountId?: string }} */
   const filter = {
     uid,
@@ -364,7 +406,7 @@ export async function verifyOtp(uid, code, purpose, id) {
   if (purpose !== PURPOSE.SIGNIN_VERIFY_EMAIL) {
     filter.accountId = id
   }
-  const doc = await otpsRepository.findOne(filter)
+  const doc = await otpsRepository.findOne(filter, session)
 
   /** @type {VerifyResult} */
   const consumedOrExpiredResult = {
@@ -386,7 +428,7 @@ export async function verifyOtp(uid, code, purpose, id) {
   const failResult = { status: STATUS.INVALID }
 
   if (!ok) {
-    const { consumed, target } = await spendAttempt(claim)
+    const { consumed, target } = await spendAttempt(claim, session)
 
     if (consumed) {
       await publishIncorrectCodeLockoutEvent(uid, purpose, id, target)
@@ -398,14 +440,25 @@ export async function verifyOtp(uid, code, purpose, id) {
   }
 
   const account = doc.accountId
-    ? await accountsRepository.findById(doc.accountId)
-    : await accountsRepository.findByEmail(doc.target)
+    ? await accountsRepository.findById(doc.accountId, session)
+    : await accountsRepository.findByEmail(doc.target, session)
 
   if (account) {
-    return handleWhenAccountExists(account, uid, purpose, claim, failResult)
+    return handleWhenAccountExists(
+      account,
+      uid,
+      purpose,
+      claim,
+      failResult,
+      session
+    )
   }
 
-  const verified = await otpsRepository.update(claim, { verified: true })
+  const verified = await otpsRepository.update(
+    claim,
+    { verified: true },
+    session
+  )
 
   if (!verified) {
     return failResult
@@ -420,26 +473,31 @@ export async function verifyOtp(uid, code, purpose, id) {
  * @param {PurposeType} purpose
  * @param {ClaimType} claim
  * @param {VerifyResult} failResult
+ * @param {ClientSession} session
  */
 async function handleWhenAccountExists(
   account,
   uid,
   purpose,
   claim,
-  failResult
+  failResult,
+  session
 ) {
   if (purpose === PURPOSE.SIGNIN_VERIFY_EMAIL) {
     // A successful sign-in shows that the user owns the address, so set the
     // OTP request count back to zero. The next sign-in then starts with the
     // full number of requests.
-    await clearRequestCount(account.email)
-
-    const consumed = await otpsRepository.update(claim, { consumed: true })
+    const consumed = await otpsRepository.update(
+      claim,
+      { consumed: true },
+      session
+    )
 
     if (!consumed) {
       return failResult // concurrently spent or superseded by a resend
     }
 
+    await clearRequestCount(account.email, session)
     setUserId(account._id)
     await auditSignIn(account._id, account.email, uid)
     return { status: STATUS.SIGNED_IN, accountId: account._id }
@@ -449,10 +507,14 @@ async function handleWhenAccountExists(
   // - PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL
   // - PURPOSE.ACCOUNT_CHANGE_EMAIL_VERIFY_PHONE
   // - PURPOSE.ACCOUNT_CHANGE_PHONE_VERIFY_EMAIL
-  const verifiedOtp = await otpsRepository.update(claim, {
-    verified: true,
-    expireAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000)
-  })
+  const verifiedOtp = await otpsRepository.update(
+    claim,
+    {
+      verified: true,
+      expireAt: new Date(Date.now() + OTP_TTL_SECONDS * 1000)
+    },
+    session
+  )
 
   if (!verifiedOtp) {
     return failResult
@@ -468,10 +530,8 @@ async function handleWhenAccountExists(
  * expiry in-app in case it hasn't been dropped yet - this is security
  * related, we need to be sure.
  *
- * Likewise the attempt budget. Reaching it marks the record used, but that
- * write can fail or be cut short by a crash, and a lockout that only holds
- * when the last write succeeded is no lockout at all. The count is the
- * authority; marking it used is the tidy-up.
+ * Likewise the attempt budget. The count is the authority even if a record
+ * has reached the limit without being marked consumed.
  * @param {OtpDocument} doc
  */
 function isGuessable(doc) {
@@ -483,18 +543,17 @@ function isGuessable(doc) {
 
 /**
  * Spends one attempt against the exact record version that was read. Hitting
- * the budget marks the record used, which is the tidy-up rather than the
- * lockout — isGuessable reads the count on the next attempt and is what
- * actually holds the door shut.
+ * the budget marks the record used. Both writes use the same transaction.
  * @param {Filter<OtpDocument>} claim
+ * @param {ClientSession} session
  */
-async function spendAttempt(claim) {
-  const updated = await otpsRepository.incrementAttempts(claim)
+async function spendAttempt(claim, session) {
+  const updated = await otpsRepository.incrementAttempts(claim, session)
   const attempts = updated?.attempts ?? 0
   let consumed = false
 
   if (attempts >= OTP_MAX_ATTEMPTS) {
-    consumed = await otpsRepository.update(claim, { consumed: true })
+    consumed = await otpsRepository.update(claim, { consumed: true }, session)
   }
 
   return { consumed, target: updated?.target }
@@ -529,7 +588,7 @@ export async function findOtp(uid, purpose) {
 }
 
 /**
- * @import { Filter, WithId } from 'mongodb'
+ * @import { ClientSession, Filter, WithId } from 'mongodb'
  * @import { HashOptions } from 'argon2'
  * @import { OtpDocument } from '~/src/repositories/otps-repository.js'
  * @import { OtpLockoutDocument } from '~/src/repositories/otp-lockouts-repository.js'

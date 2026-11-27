@@ -4,6 +4,7 @@ import argon2 from 'argon2'
 
 import { CY, EN_GB, PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail, sendSms } from '~/src/lib/notify.js'
+import { client } from '~/src/mongo.js'
 import { findById } from '~/src/repositories/accounts-repository.js'
 import {
   findOne as lockoutFindOne,
@@ -11,11 +12,15 @@ import {
 } from '~/src/repositories/otp-lockouts-repository.js'
 import { findOne, update } from '~/src/repositories/otps-repository.js'
 import { requestOtp, verifyOtp } from '~/src/services/otp-service.js'
+import { createTransactionSession } from '~/test/helpers/transaction-session.js'
 
 jest.mock('~/src/repositories/accounts-repository.js')
 jest.mock('~/src/repositories/otps-repository.js')
 jest.mock('~/src/repositories/otp-lockouts-repository.js')
 jest.mock('~/src/lib/notify.js')
+jest.mock('~/src/mongo.js', () => ({
+  client: { startSession: jest.fn() }
+}))
 jest.mock('@defra/cdp-auditing')
 jest.mock('argon2')
 
@@ -24,8 +29,15 @@ describe('otp-service', () => {
   const email = 'test-email@test.com'
   const accountId = 'acc-id'
 
+  /** @type {ReturnType<typeof createTransactionSession>} */
+  let transactionSession
+
   beforeEach(() => {
     jest.clearAllMocks()
+    transactionSession = createTransactionSession()
+    jest
+      .mocked(client.startSession)
+      .mockReturnValue(/** @type {never} */ (transactionSession))
     jest.mocked(lockoutFindOne).mockResolvedValueOnce(null)
     // @ts-expect-error - partial mock of test data
     jest.mocked(incrementRequests).mockResolvedValueOnce({ requests: 0 })
@@ -236,13 +248,16 @@ describe('otp-service', () => {
         accountId
       )
       expect(res).toEqual({ status: 'invalid-code-consumed-or-expired' })
-      expect(findOne).toHaveBeenCalledWith({
-        accountId: 'acc-id',
-        consumed: false,
-        purpose: 'ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL',
-        uid: 'uid-1',
-        verified: false
-      })
+      expect(findOne).toHaveBeenCalledWith(
+        {
+          accountId: 'acc-id',
+          consumed: false,
+          purpose: 'ACCOUNT_CHANGE_EMAIL_VERIFY_EMAIL',
+          uid: 'uid-1',
+          verified: false
+        },
+        transactionSession
+      )
     })
 
     it('should not add account_id to filter if SIGNIN', async () => {
@@ -253,12 +268,15 @@ describe('otp-service', () => {
         accountId
       )
       expect(res).toEqual({ status: 'invalid-code-consumed-or-expired' })
-      expect(findOne).toHaveBeenCalledWith({
-        consumed: false,
-        purpose: 'SIGNIN_VERIFY_EMAIL',
-        uid: 'uid-1',
-        verified: false
-      })
+      expect(findOne).toHaveBeenCalledWith(
+        {
+          consumed: false,
+          purpose: 'SIGNIN_VERIFY_EMAIL',
+          uid: 'uid-1',
+          verified: false
+        },
+        transactionSession
+      )
     })
 
     it('should verify only, not consume', async () => {
