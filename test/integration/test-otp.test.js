@@ -2,7 +2,7 @@ import { config } from '~/src/config/index.js'
 import { PURPOSE, TRANSPORT } from '~/src/constants.js'
 import { sendEmail } from '~/src/lib/notify.js'
 import { TEST_OTPS_COLLECTION_NAME, db } from '~/src/mongo.js'
-import { createAccount } from '~/src/services/signin-service.js'
+import { createAccount } from '~/src/services/test-helper.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))

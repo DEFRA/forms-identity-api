@@ -4,7 +4,7 @@ import {
   OTP_LOCKOUTS_COLLECTION_NAME,
   db
 } from '~/src/mongo.js'
-import { createAccount } from '~/src/services/signin-service.js'
+import { createAccount } from '~/src/services/test-helper.js'
 import { setupSigninFlow } from '~/test/helpers/signin-flow.js'
 
 jest.mock('~/src/lib/notify.js', () => ({ sendEmail: jest.fn() }))

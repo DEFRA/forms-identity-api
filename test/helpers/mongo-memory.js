@@ -1,4 +1,4 @@
-import { MongoMemoryServer } from 'mongodb-memory-server'
+import { MongoMemoryReplSet } from 'mongodb-memory-server'
 
 import { config } from '~/src/config/index.js'
 import { client, prepareDb } from '~/src/mongo.js'
@@ -10,10 +10,9 @@ import { client, prepareDb } from '~/src/mongo.js'
 export const MONGO_BOOT_TIMEOUT_MS = 180_000
 
 /**
- * Boots an in-memory mongod (a real MongoDB binary backed by in-memory
- * storage) and points the app config at it, so integration suites run against
- * genuine Mongo semantics: unique indexes, atomic filtered updates and
- * duplicate-key errors. Callers own the lifecycle — stop() it in afterAll,
+ * Boots an in-memory single-node replica set and points the app config at it,
+ * so integration suites exercise transaction semantics as well as genuine
+ * Mongo behavior. Callers own the lifecycle — stop() it in afterAll,
  * alongside closing the app's Mongo client.
  *
  * The mongod version comes from config.mongodbMemoryServer.version in
@@ -22,8 +21,12 @@ export const MONGO_BOOT_TIMEOUT_MS = 180_000
  * same major version. CI reads the same value to choose the mongo image it
  * copies the binary from, so there is only one place to change it.
  */
-export async function startMongoMemoryServer() {
-  const mongod = await MongoMemoryServer.create()
+export async function startMongoMemoryReplSet() {
+  // WiredTiger, as in production: the default in-memory engine does not
+  // support the snapshot reads that transactions use
+  const mongod = await MongoMemoryReplSet.create({
+    replSet: { count: 1, storageEngine: 'wiredTiger' }
+  })
 
   config.set('mongo.uri', mongod.getUri())
 
@@ -32,16 +35,16 @@ export async function startMongoMemoryServer() {
 
 /**
  * Registers suite lifecycle hooks for integration tests that talk to the
- * database directly (no HTTP server): boots an in-memory mongod, runs
+ * database directly (no HTTP server): boots an in-memory replica set, runs
  * prepareDb so the real startup indexes exist, and tears both down after
  * the suite
  */
 export function setupIntegrationDb() {
-  /** @type {MongoMemoryServer} */
+  /** @type {MongoMemoryReplSet} */
   let mongod
 
   beforeAll(async () => {
-    mongod = await startMongoMemoryServer()
+    mongod = await startMongoMemoryReplSet()
     await prepareDb(/** @type {never} */ ({ info: () => undefined }))
   }, MONGO_BOOT_TIMEOUT_MS)
 

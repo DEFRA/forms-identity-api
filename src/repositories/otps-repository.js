@@ -27,9 +27,10 @@ function coll() {
 
 /**
  * @param {Filter<OtpDocument>} filter
+ * @param {ClientSession} [session]
  */
-export function findOne(filter) {
-  return coll().findOne(filter)
+export function findOne(filter, session) {
+  return coll().findOne(filter, { session })
 }
 
 /**
@@ -52,26 +53,32 @@ export async function upsert(key, fields) {
  * longer matched, i.e. a concurrent request already moved the state.
  * @param {Filter<OtpDocument>} filter
  * @param {MatchKeysAndValues<OtpDocument>} fields
+ * @param {ClientSession} [session]
  * @returns {Promise<boolean>} whether a record matched
  */
-export async function update(filter, fields) {
-  const { matchedCount } = await coll().updateOne(filter, { $set: fields })
+export async function update(filter, fields, session) {
+  const { matchedCount } = await coll().updateOne(
+    filter,
+    { $set: fields },
+    { session }
+  )
   return matchedCount > 0
 }
 
 /**
  * Atomically increments the attempt counter, returning the updated record
  * @param {Filter<OtpDocument>} filter
+ * @param {ClientSession} [session]
  * @returns {Promise<OtpDocument | null>} null when no record matches
  */
-export function incrementAttempts(filter) {
+export function incrementAttempts(filter, session) {
   return coll().findOneAndUpdate(
     filter,
     { $inc: { attempts: 1 } },
-    { returnDocument: 'after' }
+    { returnDocument: 'after', ...(session && { session }) }
   )
 }
 
 /**
- * @import { Collection, Filter, MatchKeysAndValues } from 'mongodb'
+ * @import { ClientSession, Collection, Filter, MatchKeysAndValues } from 'mongodb'
  */
