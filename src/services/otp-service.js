@@ -312,9 +312,7 @@ export function clearRequestCount(target, session) {
  *                         drift from the configured TTL
  *   ((action))           -> the action the OTP is for (already translated into the target language)
  * and may contain:
- *   ((service_name))      -> the name of the service the sign in is for, or empty
- *   ((has_service_name))  -> 'yes' or 'no', for a conditional line such as
- *                         ((has_service_name??You're signing in to ((service_name)).))
+ *   ((service_phrase))      -> the name of the service the sign in is for (with a possible prefixed word), or empty
  * Both form keys are always sent, so a template that uses them never fails
  * for a sign in that names no form.
  * @param {string} email
@@ -343,6 +341,8 @@ function sendOtpEmail(email, code, purpose, language, serviceName) {
  *   ((code))           -> the 6-digit one-time code
  *   ((expiry_minutes)) -> derived from otp.ttlSeconds so the email can never
  *                         drift from the configured TTL
+ * and may contain:
+ *   ((service_phrase))      -> the name of the service the sign in is for (with a possible prefixed word), or empty
  * @param {string} phoneNumber
  * @param {string} code
  * @param {PurposeType} purpose - the action the OTP is for
